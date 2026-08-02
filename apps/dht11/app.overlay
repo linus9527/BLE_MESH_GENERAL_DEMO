@@ -1,0 +1,14 @@
+/ {
+	aliases {
+		app-red = &led0;
+		app-green = &led1;
+		app-blue = &led2;
+		dht11 = &mesh_dht11;
+	};
+
+	mesh_dht11: dht11 {
+		compatible = "aosong,dht";
+		dio-gpios = <&xiao_d 0 (GPIO_PULL_UP | GPIO_ACTIVE_HIGH)>;
+		status = "okay";
+	};
+};

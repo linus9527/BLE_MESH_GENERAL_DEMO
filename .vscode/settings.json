@@ -1,0 +1,9 @@
+{
+    "nrf-connect.applications": [
+        "${workspaceFolder}\\apps\\gateway",
+        "${workspaceFolder}\\apps\\dht11",
+        "${workspaceFolder}\\apps\\button",
+        "${workspaceFolder}\\apps\\servo",
+        "${workspaceFolder}\\apps\\blinky"
+    ]
+}
