@@ -1,4 +1,4 @@
-# BLE Mesh Button Demo
+# BLE_MESH_DEMO
 
 基于 nRF Connect SDK 2.9.3 的四板 BLE Mesh 演示项目：
 
