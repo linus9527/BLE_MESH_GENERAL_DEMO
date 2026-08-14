@@ -12,6 +12,7 @@ static bool gateway_reachable;
 static bool gateway_heartbeat_expired;
 static bool online_acknowledged;
 static bool warning_active;
+static bool sensor_error_active;
 static uint8_t online_token;
 
 static void periodic_work_handler(struct k_work *work);
@@ -29,7 +30,7 @@ static void update_led(void)
 		return;
 	}
 
-	if (gateway_heartbeat_expired) {
+	if (gateway_heartbeat_expired || sensor_error_active) {
 		app_led_set(APP_LED_ERROR);
 		return;
 	}
@@ -112,6 +113,7 @@ void app_node_mesh_reset(void)
 	gateway_heartbeat_expired = false;
 	online_acknowledged = false;
 	warning_active = false;
+	sensor_error_active = false;
 	(void)k_work_cancel_delayable(&online_notify_work);
 	(void)k_work_cancel_delayable(&periodic_work);
 	(void)k_work_cancel_delayable(&gateway_watchdog);
@@ -155,6 +157,12 @@ void app_node_set_warning(bool warning)
 	update_led();
 }
 
+void app_node_set_sensor_error(bool active)
+{
+	sensor_error_active = active;
+	update_led();
+}
+
 uint8_t app_node_state_flags(void)
 {
 	uint8_t flags = 0;
@@ -167,6 +175,9 @@ uint8_t app_node_state_flags(void)
 	}
 	if (warning_active) {
 		flags |= APP_NODE_STATE_ALERT;
+	}
+	if (sensor_error_active) {
+		flags |= APP_NODE_STATE_SENSOR_ERROR;
 	}
 
 	return flags;

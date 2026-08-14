@@ -45,11 +45,12 @@ static void report_dht11(void)
 	if (!dht11_ready || sensor_sample_fetch(dht11) ||
 	    sensor_channel_get(dht11, SENSOR_CHAN_AMBIENT_TEMP, &temperature) ||
 	    sensor_channel_get(dht11, SENSOR_CHAN_HUMIDITY, &humidity)) {
-		app_node_set_warning(true);
+		app_node_set_sensor_error(true);
 		(void)app_mesh_send_node_heartbeat(APP_DEVICE_DHT11,
-			app_node_state_flags() | APP_NODE_STATE_SENSOR_ERROR, sequence++);
+			app_node_state_flags(), sequence++);
 		return;
 	}
+	app_node_set_sensor_error(false);
 
 	temperature_c = CLAMP(temperature.val1, INT8_MIN, INT8_MAX);
 	humidity_pct = CLAMP(humidity.val1, 0, UINT8_MAX);

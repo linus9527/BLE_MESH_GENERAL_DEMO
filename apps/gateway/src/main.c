@@ -27,6 +27,7 @@ struct tracked_device {
 	const char *name;
 	bool known;
 	bool online;
+	bool sensor_error_active;
 	uint16_t mesh_address;
 	int64_t last_seen_ms;
 };
@@ -35,6 +36,7 @@ static struct tracked_device devices[] = {
 	{ APP_DEVICE_DHT11, "BLE_MESH_DHT11", "DHT11_Node" },
 	{ APP_DEVICE_BUTTON, "BLE_MESH_BUTTON", "Button_Node" },
 	{ APP_DEVICE_SERVO, "BLE_MESH_SERVO", "Servo_Node" },
+	{ APP_DEVICE_PH, "BLE_MESH_PH", "PH_Node" },
 };
 
 static const struct device *const serial = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
@@ -138,6 +140,34 @@ static struct tracked_device *mark_device_seen(enum app_device_type type, uint16
 	return device;
 }
 
+static void update_sensor_error(struct tracked_device *device, bool active, const char *error)
+{
+	bool changed;
+	uint16_t mesh_address;
+
+	if (device == NULL) {
+		return;
+	}
+
+	k_mutex_lock(&device_mutex, K_FOREVER);
+	changed = device->sensor_error_active != active;
+	device->sensor_error_active = active;
+	mesh_address = device->mesh_address;
+	k_mutex_unlock(&device_mutex);
+	if (!changed) {
+		return;
+	}
+
+	if (active) {
+		emit_json("{\"type\":\"sensor_error\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"error\":\"%s\",\"timestamp_ms\":%lld}",
+			  device->id, device->name, mesh_address, error,
+			  (long long)timestamp_ms());
+	} else {
+		emit_json("{\"type\":\"sensor_recovered\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"timestamp_ms\":%lld}",
+			  device->id, device->name, mesh_address, (long long)timestamp_ms());
+	}
+}
+
 static void gateway_heartbeat_handler(struct k_work *work)
 {
 	ARG_UNUSED(work);
@@ -159,6 +189,7 @@ static void device_liveness_handler(struct k_work *work)
 		}
 
 		device->online = false;
+		device->sensor_error_active = false;
 		emit_json("{\"type\":\"device_offline\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"timeout_ms\":%d,\"timestamp_ms\":%lld}",
 			  device->id, device->name, device->mesh_address, APP_OFFLINE_TIMEOUT_MS,
 			  (long long)now);
@@ -205,6 +236,54 @@ static const char *servo_result_name(uint8_t result)
 	}
 }
 
+static const char *ph_calibration_point_name(uint8_t point)
+{
+	switch (point) {
+	case APP_PH_CALIBRATION_PH_4_00:
+		return "4.00";
+	case APP_PH_CALIBRATION_PH_6_86:
+		return "6.86";
+	case APP_PH_CALIBRATION_PH_7_00:
+		return "7.00";
+	case APP_PH_CALIBRATION_PH_9_18:
+		return "9.18";
+	case APP_PH_CALIBRATION_PH_10_00:
+		return "10.00";
+	case APP_PH_CALIBRATION_PH_10_01:
+		return "10.01";
+	default:
+		return "unknown";
+	}
+}
+
+static const char *ph_calibration_result_name(uint8_t result)
+{
+	switch (result) {
+	case APP_PH_CALIBRATION_SUCCESS:
+		return "success";
+	case APP_PH_CALIBRATION_COMMUNICATION_ERROR:
+		return "communication_error";
+	default:
+		return "rejected";
+	}
+}
+
+static void format_fixed_1(char *buffer, size_t size, int16_t value)
+{
+	int32_t magnitude = value < 0 ? -(int32_t)value : value;
+
+	snprintk(buffer, size, "%s%ld.%01ld", value < 0 ? "-" : "",
+		  (long)(magnitude / 10), (long)(magnitude % 10));
+}
+
+static void format_fixed_2(char *buffer, size_t size, int16_t value)
+{
+	int32_t magnitude = value < 0 ? -(int32_t)value : value;
+
+	snprintk(buffer, size, "%s%ld.%02ld", value < 0 ? "-" : "",
+		  (long)(magnitude / 100), (long)(magnitude % 100));
+}
+
 static void mesh_message_received(const struct app_mesh_message *message)
 {
 	struct tracked_device *device;
@@ -231,11 +310,12 @@ static void mesh_message_received(const struct app_mesh_message *message)
 		emit_json("{\"type\":\"device_heartbeat\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"state_flags\":%u,\"timestamp_ms\":%lld}",
 			  device->id, device->name, device->mesh_address, message->payload[2],
 			  (long long)timestamp_ms());
-		if (message->payload[1] == APP_DEVICE_DHT11 &&
-		    (message->payload[2] & APP_NODE_STATE_SENSOR_ERROR)) {
-			emit_json("{\"type\":\"sensor_error\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"error\":\"read_failed\",\"timestamp_ms\":%lld}",
-				  device->id, device->name, device->mesh_address,
-				  (long long)timestamp_ms());
+		if (message->payload[1] == APP_DEVICE_DHT11 ||
+		    message->payload[1] == APP_DEVICE_PH) {
+			update_sensor_error(
+				device, (message->payload[2] & APP_NODE_STATE_SENSOR_ERROR) != 0U,
+				message->payload[1] == APP_DEVICE_PH ? "modbus_read_failed" :
+								      "read_failed");
 		}
 		break;
 	case APP_OPCODE_DHT_REPORT:
@@ -243,6 +323,7 @@ static void mesh_message_received(const struct app_mesh_message *message)
 		if (device == NULL) {
 			return;
 		}
+		update_sensor_error(device, false, "read_failed");
 		emit_json("{\"type\":\"dht_report\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"temperature_c\":%d,\"humidity_pct\":%u,\"timestamp_ms\":%lld}",
 			  device->id, device->name, device->mesh_address, (int8_t)message->payload[1],
 			  message->payload[2], (long long)timestamp_ms());
@@ -276,6 +357,37 @@ static void mesh_message_received(const struct app_mesh_message *message)
 			  servo_result_name(message->payload[1]), direction_name(message->payload[2]),
 			  message->payload[3], (long long)timestamp_ms());
 		break;
+	case APP_OPCODE_PH_REPORT: {
+		char temperature[16];
+		char ph[16];
+		char millivolts[16];
+
+		device = mark_device_seen(APP_DEVICE_PH, message->source);
+		if (device == NULL) {
+			return;
+		}
+		update_sensor_error(device, false, "modbus_read_failed");
+		format_fixed_1(temperature, sizeof(temperature),
+			       (int16_t)sys_get_le16(&message->payload[1]));
+		format_fixed_2(ph, sizeof(ph), (int16_t)sys_get_le16(&message->payload[3]));
+		format_fixed_1(millivolts, sizeof(millivolts),
+			       (int16_t)sys_get_le16(&message->payload[5]));
+		emit_json("{\"type\":\"ph_report\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"temperature_c\":%s,\"ph\":%s,\"ph_mv\":%s,\"timestamp_ms\":%lld}",
+			  device->id, device->name, device->mesh_address, temperature, ph,
+			  millivolts, (long long)timestamp_ms());
+		break;
+	}
+	case APP_OPCODE_PH_CALIBRATION_RESULT:
+		device = mark_device_seen(APP_DEVICE_PH, message->source);
+		if (device == NULL) {
+			return;
+		}
+		emit_json("{\"type\":\"ph_calibration_result\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"point\":\"%s\",\"result\":\"%s\",\"timestamp_ms\":%lld}",
+			  device->id, device->name, device->mesh_address,
+			  ph_calibration_point_name(message->payload[1]),
+			  ph_calibration_result_name(message->payload[2]),
+			  (long long)timestamp_ms());
+		break;
 	default:
 		break;
 	}
@@ -298,6 +410,7 @@ static void mesh_reset(void)
 	for (size_t index = 0; index < ARRAY_SIZE(devices); index++) {
 		devices[index].known = false;
 		devices[index].online = false;
+		devices[index].sensor_error_active = false;
 		devices[index].mesh_address = BT_MESH_ADDR_UNASSIGNED;
 		devices[index].last_seen_ms = 0;
 	}
@@ -363,22 +476,85 @@ static void emit_invalid_command(const char *reason)
 		  reason, (long long)timestamp_ms());
 }
 
+static bool parse_ph_calibration_point(const char *text,
+				       enum app_ph_calibration_point *point)
+{
+	if (strcmp(text, "4.00") == 0) {
+		*point = APP_PH_CALIBRATION_PH_4_00;
+	} else if (strcmp(text, "6.86") == 0) {
+		*point = APP_PH_CALIBRATION_PH_6_86;
+	} else if (strcmp(text, "7.00") == 0) {
+		*point = APP_PH_CALIBRATION_PH_7_00;
+	} else if (strcmp(text, "9.18") == 0) {
+		*point = APP_PH_CALIBRATION_PH_9_18;
+	} else if (strcmp(text, "10.00") == 0) {
+		*point = APP_PH_CALIBRATION_PH_10_00;
+	} else if (strcmp(text, "10.01") == 0) {
+		*point = APP_PH_CALIBRATION_PH_10_01;
+	} else {
+		return false;
+	}
+
+	return true;
+}
+
 static void process_serial_line(const char *line)
 {
 	char type[32];
 	char device_id[32];
 	char direction[16];
+	char point_text[16];
 	struct tracked_device *servo = device_for_type(APP_DEVICE_SERVO);
+	struct tracked_device *ph_device = device_for_type(APP_DEVICE_PH);
 	bool servo_online;
 	long value;
 	int err;
 
 	if (!json_read_string(line, "type", type, sizeof(type)) ||
-	    !json_read_string(line, "device_id", device_id, sizeof(device_id)) ||
-	    strcmp(device_id, "BLE_MESH_SERVO") != 0) {
+	    !json_read_string(line, "device_id", device_id, sizeof(device_id))) {
 		emit_invalid_command("invalid_schema");
 		return;
 	}
+
+	if (strcmp(device_id, "BLE_MESH_PH") == 0) {
+		enum app_ph_calibration_point point;
+		bool ph_online;
+		uint16_t ph_address;
+
+		if (strcmp(type, "ph_calibrate") != 0 ||
+		    !json_read_string(line, "point", point_text, sizeof(point_text)) ||
+		    !parse_ph_calibration_point(point_text, &point)) {
+			emit_invalid_command("invalid_ph_calibration");
+			return;
+		}
+
+		k_mutex_lock(&device_mutex, K_FOREVER);
+		ph_online = ph_device != NULL && ph_device->online;
+		ph_address = ph_device != NULL ? ph_device->mesh_address : BT_MESH_ADDR_UNASSIGNED;
+		k_mutex_unlock(&device_mutex);
+		if (!ph_online) {
+			emit_json("{\"type\":\"node_offline\",\"device_id\":\"BLE_MESH_PH\",\"device_name\":\"PH_Node\",\"timestamp_ms\":%lld}",
+				  (long long)timestamp_ms());
+			return;
+		}
+
+		err = app_mesh_send_ph_calibration(ph_address, point, command_sequence++);
+		if (err) {
+			emit_json("{\"type\":\"mesh_send_failed\",\"device_id\":\"BLE_MESH_PH\",\"error\":%d,\"timestamp_ms\":%lld}",
+				  err, (long long)timestamp_ms());
+			return;
+		}
+
+		emit_json("{\"type\":\"ph_calibration_accepted\",\"device_id\":\"BLE_MESH_PH\",\"point\":\"%s\",\"timestamp_ms\":%lld}",
+			  point_text, (long long)timestamp_ms());
+		return;
+	}
+
+	if (strcmp(device_id, "BLE_MESH_SERVO") != 0) {
+		emit_invalid_command("unknown_device");
+		return;
+	}
+
 	k_mutex_lock(&device_mutex, K_FOREVER);
 	servo_online = servo != NULL && servo->online;
 	k_mutex_unlock(&device_mutex);

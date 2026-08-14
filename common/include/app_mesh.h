@@ -40,5 +40,12 @@ int app_mesh_send_servo_result(enum app_servo_result result,
 			       uint8_t sequence);
 int app_mesh_send_gateway_heartbeat(uint8_t sequence);
 int app_mesh_send_servo_calibration(uint16_t stop_pulse_us, uint8_t sequence);
+int app_mesh_send_ph_report(int16_t temperature_x10, int16_t ph_x100, int16_t ph_mv_x10,
+			    uint8_t sequence);
+int app_mesh_send_ph_calibration(uint16_t destination,
+			 enum app_ph_calibration_point point, uint8_t sequence);
+int app_mesh_send_ph_calibration_result(enum app_ph_calibration_point point,
+					enum app_ph_calibration_result result,
+					uint8_t sequence);
 
 #endif

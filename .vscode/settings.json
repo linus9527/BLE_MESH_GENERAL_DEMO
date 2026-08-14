@@ -4,6 +4,7 @@
         "${workspaceFolder}\\apps\\dht11",
         "${workspaceFolder}\\apps\\button",
         "${workspaceFolder}\\apps\\servo",
-        "${workspaceFolder}\\apps\\blinky"
+        "${workspaceFolder}\\apps\\blinky",
+        "${workspaceFolder}\\apps\\ph"
     ]
 }

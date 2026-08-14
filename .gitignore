@@ -1,4 +1,5 @@
 build/
+/apps/*/build*/
 *.elf
 *.hex
 *.map

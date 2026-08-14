@@ -58,6 +58,9 @@ APP_MESSAGE_HANDLER(gateway_heartbeat_received, APP_OPCODE_GATEWAY_HEARTBEAT)
 APP_MESSAGE_HANDLER(servo_calibration_received, APP_OPCODE_SERVO_CALIBRATE_STOP)
 APP_MESSAGE_HANDLER(node_online_received, APP_OPCODE_NODE_ONLINE)
 APP_MESSAGE_HANDLER(node_online_ack_received, APP_OPCODE_NODE_ONLINE_ACK)
+APP_MESSAGE_HANDLER(ph_report_received, APP_OPCODE_PH_REPORT)
+APP_MESSAGE_HANDLER(ph_calibrate_received, APP_OPCODE_PH_CALIBRATE)
+APP_MESSAGE_HANDLER(ph_calibration_result_received, APP_OPCODE_PH_CALIBRATION_RESULT)
 
 static const struct bt_mesh_model_op application_model_ops[] = {
 	{ APP_MESH_OP(APP_OPCODE_NODE_HEARTBEAT), BT_MESH_LEN_EXACT(4), node_heartbeat_received },
@@ -70,6 +73,10 @@ static const struct bt_mesh_model_op application_model_ops[] = {
 	{ APP_MESH_OP(APP_OPCODE_SERVO_CALIBRATE_STOP), BT_MESH_LEN_EXACT(4), servo_calibration_received },
 	{ APP_MESH_OP(APP_OPCODE_NODE_ONLINE), BT_MESH_LEN_EXACT(3), node_online_received },
 	{ APP_MESH_OP(APP_OPCODE_NODE_ONLINE_ACK), BT_MESH_LEN_EXACT(3), node_online_ack_received },
+	{ APP_MESH_OP(APP_OPCODE_PH_REPORT), BT_MESH_LEN_EXACT(8), ph_report_received },
+	{ APP_MESH_OP(APP_OPCODE_PH_CALIBRATE), BT_MESH_LEN_EXACT(3), ph_calibrate_received },
+	{ APP_MESH_OP(APP_OPCODE_PH_CALIBRATION_RESULT), BT_MESH_LEN_EXACT(4),
+	  ph_calibration_result_received },
 	BT_MESH_MODEL_OP_END,
 };
 
@@ -281,5 +288,35 @@ int app_mesh_send_servo_calibration(uint16_t stop_pulse_us, uint8_t sequence)
 
 	sys_put_le16(stop_pulse_us, &payload[1]);
 	return send_message(APP_OPCODE_SERVO_CALIBRATE_STOP, APP_GROUP_SERVO_CONTROL, payload,
+			    sizeof(payload));
+}
+
+int app_mesh_send_ph_report(int16_t temperature_x10, int16_t ph_x100, int16_t ph_mv_x10,
+			    uint8_t sequence)
+{
+	uint8_t payload[8] = { APP_PROTOCOL_VERSION };
+
+	sys_put_le16((uint16_t)temperature_x10, &payload[1]);
+	sys_put_le16((uint16_t)ph_x100, &payload[3]);
+	sys_put_le16((uint16_t)ph_mv_x10, &payload[5]);
+	payload[7] = sequence;
+	return send_message(APP_OPCODE_PH_REPORT, APP_GROUP_NODE_STATUS, payload, sizeof(payload));
+}
+
+int app_mesh_send_ph_calibration(uint16_t destination,
+			 enum app_ph_calibration_point point, uint8_t sequence)
+{
+	const uint8_t payload[] = { APP_PROTOCOL_VERSION, point, sequence };
+
+	return send_message(APP_OPCODE_PH_CALIBRATE, destination, payload, sizeof(payload));
+}
+
+int app_mesh_send_ph_calibration_result(enum app_ph_calibration_point point,
+					enum app_ph_calibration_result result,
+					uint8_t sequence)
+{
+	const uint8_t payload[] = { APP_PROTOCOL_VERSION, point, result, sequence };
+
+	return send_message(APP_OPCODE_PH_CALIBRATION_RESULT, APP_GROUP_NODE_STATUS, payload,
 			    sizeof(payload));
 }

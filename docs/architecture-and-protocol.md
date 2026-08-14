@@ -2,7 +2,7 @@
 
 ## 1. 范围
 
-本项目使用 nRF Connect SDK 2.9.3 与 Zephyr Bluetooth Mesh，在四块 nRF52840 开发板上实现本地物联演示。电脑串口终端暂时模拟云端；网关是 Mesh 和云端接口之间的唯一边界。
+本项目使用 nRF Connect SDK 2.9.3 与 Zephyr Bluetooth Mesh，在五块 nRF52840 开发板上实现本地物联演示。电脑串口终端暂时模拟云端；网关是 Mesh 和云端接口之间的唯一边界。
 
 首次配网、AppKey 绑定、发布地址与订阅地址配置由 Nordic nRF Mesh App 完成。网关不承担 Provisioner 角色。
 
@@ -13,6 +13,7 @@
 | `BLE_MESH_DHT11` | `DHT11_Node` | `xiao_ble/nrf52840/sense` | 每 5 秒采集并上报温湿度；阈值状态变化时告警。 |
 | `BLE_MESH_BUTTON` | `Button_Node` | `xiao_ble/nrf52840/sense` | 即时上报按下、松开事件；每 5 秒发送在线心跳。 |
 | `BLE_MESH_SERVO` | `Servo_Node` | `xiao_ble/nrf52840/sense` | 控制连续旋转 SG90 的方向、速度、停止；每 5 秒发送在线心跳。 |
+| `BLE_MESH_PH` | `PH_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 5 秒读取并上报温度、pH 和 pH 毫伏值；支持远程校准。 |
 | `BLE_MESH_GATEWAY` | `Gateway_Node` | `nrf52840_mdk/nrf52840` | 管理节点在线状态，转换 Mesh 与串口 JSON，并每 5 秒发送网关心跳。 |
 
 所有设备均开启 Relay。设备数量与距离适用于近距离演示网络，不以低功耗或高吞吐为目标。
@@ -20,12 +21,14 @@
 ## 3. 网络拓扑
 
 ```text
-nRF Mesh App -- 首次配网和模型配置 --> 全部四个设备
+nRF Mesh App -- 首次配网和模型配置 --> 全部五个设备
 
 DHT11_Node --- 状态、温湿度、告警 ---> Gateway_Node --- JSON ---> 串口终端
 Button_Node -- 状态、按键事件、告警 --> Gateway_Node --- JSON ---> 串口终端
 Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> 串口终端
+PH_Node ------ 状态、pH/温度/mV ------> Gateway_Node --- JSON ---> 串口终端
 串口终端 ------ 舵机 JSON 控制命令 ----> Gateway_Node --- Mesh ---> Servo_Node
+串口终端 ------ pH JSON 校准命令 -----> Gateway_Node --- Mesh ---> PH_Node
 ```
 
 每个应用消息使用 Vendor Model：Company ID `0xFFFF`、Model ID `0x0001`。旧版曾把 `0xFFFF` 当成自定义 SIG Model，并使用 `0x8001–0x800A` 操作码；这些值与 Configuration Foundation 消息冲突，会导致上线通知、确认和校准等消息被配置服务器截获。本版改用三字节 Vendor opcode。`0xFFFF` 仅用于原型，产品化时必须替换为正式分配的 Bluetooth SIG Company ID。
@@ -34,9 +37,9 @@ Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> �
 
 | 地址 | 名称 | 发布者 | 订阅者 | 用途 |
 | --- | --- | --- | --- | --- |
-| `0xC000` | `NODE_STATUS_GROUP` | 三个功能节点 | 网关 | 节点状态、传感器、按键、舵机执行结果。 |
+| `0xC000` | `NODE_STATUS_GROUP` | 四个功能节点 | 网关 | 节点状态、传感器、按键、舵机执行结果和 pH 校准结果。 |
 | `0xC001` | `SERVO_CONTROL_GROUP` | 网关 | 舵机节点 | 舵机运行、停止、校准命令。 |
-| `0xC002` | `GATEWAY_HEARTBEAT_GROUP` | 网关 | 三个功能节点 | 网关在线心跳和舵机安全停止判定。 |
+| `0xC002` | `GATEWAY_HEARTBEAT_GROUP` | 网关 | 四个功能节点 | 网关在线心跳和舵机安全停止判定。 |
 
 源单播地址由 Mesh 网络头提供。网关将它格式化为 JSON 中的 `mesh_addr`。
 
@@ -56,11 +59,14 @@ Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> �
 | `0x08` | `SERVO_CALIBRATE_STOP` | 网关 -> 舵机节点 | `version`, `stop_pulse_us`, `sequence` |
 | `0x09` | `NODE_ONLINE` | 节点 -> 网关 | `version`, `device_type`, `token` |
 | `0x0A` | `NODE_ONLINE_ACK` | 网关 -> 节点单播 | `version`, `device_type`, `token` |
+| `0x0B` | `PH_REPORT` | pH 节点 -> 网关 | `version`, `temperature_x10`, `ph_x100`, `ph_mv_x10`, `sequence` |
+| `0x0C` | `PH_CALIBRATE` | 网关 -> pH 节点单播 | `version`, `point`, `sequence` |
+| `0x0D` | `PH_CALIBRATION_RESULT` | pH 节点 -> 网关 | `version`, `point`, `result`, `sequence` |
 
 枚举值：
 
-- `device_type`：`1` DHT11，`2` 按键，`3` 舵机。
-- `state_flags`：位 `0` 已配网，位 `1` 网关可达，位 `2` 设备告警。
+- `device_type`：`1` DHT11，`2` 按键，`3` 舵机，`4` pH。
+- `state_flags`：位 `0` 已配网，位 `1` 网关可达，位 `2` 设备告警，位 `3` 传感器读取故障。
 - `metric`：`1` 温度，`2` 湿度。
 - `state`：`1` 进入异常，`2` 恢复正常。
 - `command`：`1` 运行，`2` 停止。
@@ -74,6 +80,7 @@ Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> �
 - DHT11 节点每 5 秒发送一次 `DHT_REPORT`。该消息同时视为该节点在线心跳。
 - 按键节点只在输入连续稳定 `50 ms` 后确认状态变化并发送 `BUTTON_EVENT`；一次完整点击正常产生一条 `pressed` 和一条 `released`。节点每 5 秒发送 `NODE_HEARTBEAT`。
 - 舵机节点每 5 秒发送 `NODE_HEARTBEAT`。收到命令后发送 `SERVO_RESULT`。
+- pH 节点每 5 秒读取 Modbus 保持寄存器 `0–2` 并发送 `PH_REPORT`。读取失败时改发带传感器故障位的 `NODE_HEARTBEAT`；恢复后继续上报数据。pH 节点不做阈值告警。
 - 网关每 5 秒向 `GATEWAY_HEARTBEAT_GROUP` 发送 `GATEWAY_HEARTBEAT`。
 - 网关连续 15 秒未收到某功能节点的有效上报时，标记该节点离线。
 - 舵机节点连续 15 秒未收到有效网关心跳时，立即输出校准后的停止脉宽并上报安全停止结果；Mesh 恢复后等待新的控制命令。
@@ -111,11 +118,18 @@ Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> �
 {"type":"button_event","device_id":"BLE_MESH_BUTTON","device_name":"Button_Node","mesh_addr":"0x0006","state":"released","timestamp_ms":1730000020120}
 ```
 
+pH 定时上报：
+
+```json
+{"type":"ph_report","device_id":"BLE_MESH_PH","device_name":"PH_Node","mesh_addr":"0x0008","temperature_c":25.0,"ph":7.00,"ph_mv":0.6,"timestamp_ms":1730000025000}
+```
+
 设备离线、读取故障与舵机执行结果：
 
 ```json
 {"type":"device_offline","device_id":"BLE_MESH_SERVO","device_name":"Servo_Node","mesh_addr":"0x0007","timeout_ms":15000,"timestamp_ms":1730000035000}
 {"type":"sensor_error","device_id":"BLE_MESH_DHT11","device_name":"DHT11_Node","mesh_addr":"0x0005","error":"read_failed","timestamp_ms":1730000040000}
+{"type":"sensor_error","device_id":"BLE_MESH_PH","device_name":"PH_Node","mesh_addr":"0x0008","error":"modbus_read_failed","timestamp_ms":1730000041000}
 {"type":"servo_result","device_id":"BLE_MESH_SERVO","device_name":"Servo_Node","mesh_addr":"0x0007","result":"executed","direction":"forward","speed_pct":60,"timestamp_ms":1730000045000}
 ```
 
@@ -137,6 +151,18 @@ Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> �
 
 ```json
 {"type":"servo_calibrate_stop","device_id":"BLE_MESH_SERVO","stop_pulse_us":1500}
+```
+
+pH 校准：
+
+```json
+{"type":"ph_calibrate","device_id":"BLE_MESH_PH","point":"7.00"}
+```
+
+`point` 可取 `4.00`、`6.86`、`7.00`、`9.18`、`10.00` 或 `10.01`。网关先输出 `ph_calibration_accepted`；电极返回结果后输出：
+
+```json
+{"type":"ph_calibration_result","device_id":"BLE_MESH_PH","device_name":"PH_Node","mesh_addr":"0x0008","point":"7.00","result":"success","timestamp_ms":1730000050000}
 ```
 
 网关收到格式正确的控制命令时立即输出 `servo_command_accepted`。舵机返回 `SERVO_RESULT` 后输出最终 `servo_result`。当舵机离线、JSON 无效或 Mesh 发送失败时，网关输出相应错误类型：`node_offline`、`invalid_command` 或 `mesh_send_failed`。
@@ -164,12 +190,15 @@ Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> �
 - 按键模块使用 `3.3 V` 供电。信号为低有效；若模块上拉不足，启用 XIAO 内部上拉。
 - SG90 使用独立、至少 `1 A` 的 `5 V` 电源。舵机电源地和 XIAO GND 必须共地。
 - 连续旋转 SG90 无角度反馈，只提供正转、反转、速度和停止控制。默认停止脉宽为 `1500 us`，可通过串口命令校准并持久化保存。
+- MIK-PH-8001 电极使用独立 `12 V DC` 电源，默认 Modbus 地址 `1`、`9600 8N1`。电极电源地、XIAO GND 和 RS485 GND 必须共地；不得把 `12 V` 接到 XIAO-RS485 的 `5V` 端子。
+- XIAO-RS485 使用 `D4/P0.04` 发送、`D5/P0.05` 接收、`D2/P0.28` 控制 `DE/RE`；高电平发送、低电平接收。
+- pH 节点通过 Zephyr `zephyr,modbus-serial` 驱动管理 RTU 帧间隔、CRC、接收超时及 `DE` 收发切换，业务代码调用 `modbus_read_holding_regs()` 和 `modbus_write_holding_reg()`，不自行拼接 Modbus 帧。
 - 所有 Mesh 配网状态和舵机停止脉宽均持久化到 Flash。设备和网关重启后无需重新配网。
 
 ## 9. 后续实现顺序
 
-1. 为网关和三种节点创建共用 Vendor Model 库。
+1. 为网关和四种节点创建共用 Vendor Model 库。
 2. 先实现配网、持久化、LED、心跳和串口 JSON。
-3. 分别接入 DHT11、按键和 SG90 驱动。
-4. 使用 nRF Mesh App 完成四设备配网、AppKey 绑定与组地址配置。
-5. 按串口 JSON 用例完成四板联调。
+3. 分别接入 DHT11、按键、SG90 和 RS485 pH 电极驱动。
+4. 使用 nRF Mesh App 完成五设备配网、AppKey 绑定与组地址配置。
+5. 按串口 JSON 用例完成五设备联调。
