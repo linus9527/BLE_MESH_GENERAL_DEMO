@@ -105,6 +105,7 @@ static const struct app_mesh_callbacks mesh_callbacks = {
 static const struct app_node_config node_config = {
 	.device_type = APP_DEVICE_BUTTON,
 	.periodic = send_heartbeat,
+	.periodic_interval_ms = APP_NODE_HEARTBEAT_INTERVAL_MS,
 };
 
 static int button_init(void)

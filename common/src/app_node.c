@@ -51,7 +51,8 @@ static void periodic_work_handler(struct k_work *work)
 		node_config.periodic();
 	}
 
-	(void)k_work_reschedule(&periodic_work, K_MSEC(APP_HEARTBEAT_INTERVAL_MS));
+	(void)k_work_reschedule(&periodic_work,
+				K_MSEC(node_config.periodic_interval_ms));
 }
 
 static void gateway_watchdog_handler(struct k_work *work)
@@ -85,7 +86,7 @@ static void online_notify_handler(struct k_work *work)
 
 int app_node_init(const struct app_node_config *config)
 {
-	if (config == NULL || config->periodic == NULL) {
+	if (config == NULL || config->periodic == NULL || config->periodic_interval_ms == 0U) {
 		return -EINVAL;
 	}
 
@@ -95,6 +96,9 @@ int app_node_init(const struct app_node_config *config)
 
 void app_node_mesh_ready(void)
 {
+	uint32_t initial_report_delay_ms =
+		(uint32_t)node_config.device_type * APP_NODE_PERIODIC_STAGGER_MS;
+
 	mesh_ready = true;
 	gateway_reachable = false;
 	gateway_heartbeat_expired = false;
@@ -102,8 +106,9 @@ void app_node_mesh_ready(void)
 	online_token++;
 	update_led();
 	(void)k_work_reschedule(&online_notify_work, K_NO_WAIT);
-	(void)k_work_reschedule(&periodic_work, K_NO_WAIT);
-	(void)k_work_reschedule(&gateway_watchdog, K_MSEC(APP_OFFLINE_TIMEOUT_MS));
+	(void)k_work_reschedule(&periodic_work, K_MSEC(initial_report_delay_ms));
+	(void)k_work_reschedule(&gateway_watchdog,
+				K_MSEC(APP_GATEWAY_OFFLINE_TIMEOUT_MS));
 }
 
 void app_node_mesh_reset(void)
@@ -130,7 +135,8 @@ void app_node_gateway_heartbeat(void)
 	if (!was_reachable && !online_acknowledged) {
 		(void)k_work_reschedule(&online_notify_work, K_NO_WAIT);
 	}
-	(void)k_work_reschedule(&gateway_watchdog, K_MSEC(APP_OFFLINE_TIMEOUT_MS));
+	(void)k_work_reschedule(&gateway_watchdog,
+				K_MSEC(APP_GATEWAY_OFFLINE_TIMEOUT_MS));
 }
 
 bool app_node_online_ack(enum app_device_type device_type, uint8_t token)
@@ -146,7 +152,8 @@ bool app_node_online_ack(enum app_device_type device_type, uint8_t token)
 	gateway_reachable = true;
 	gateway_heartbeat_expired = false;
 	(void)k_work_cancel_delayable(&online_notify_work);
-	(void)k_work_reschedule(&gateway_watchdog, K_MSEC(APP_OFFLINE_TIMEOUT_MS));
+	(void)k_work_reschedule(&gateway_watchdog,
+				K_MSEC(APP_GATEWAY_OFFLINE_TIMEOUT_MS));
 	update_led();
 	return first_acknowledgement;
 }
