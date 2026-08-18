@@ -85,7 +85,7 @@ west flash -d build/gateway --runner nrfjprog --erase
 1. 将 nRF52840 Dongle 插入电脑，等待固件枚举出 CDC ACM COM 口，再用上位机或串口终端以 `115200 8N1` 打开并置位 DTR；网关已配网时会输出一行 `gateway_online` JSON。
 2. 再给 DHT11、按键、舵机、pH、DO 和 ORP 节点上电。节点在等待网关心跳和 `NODE_ONLINE_ACK` 时蓝色慢闪；网关确认上线后绿色常亮；超过 15 秒未收到网关心跳则红色闪烁。DO 节点通信正常但未完成空气校准时显示黄色。
 3. 网关收到每个节点的 `NODE_ONLINE` 后先输出 `device_online`，之后继续输出 `device_heartbeat` 或业务数据。若未出现这些 JSON，先检查 AppKey 是否绑定在 Vendor Model `0xFFFF:0x0001` 上，以及订阅地址是否正确。
-   上线阶段采用确认机制：节点每 2 秒重发 `NODE_ONLINE`，直到网关向该节点单播 `NODE_ONLINE_ACK`；确认完成后只保留正常数据上报和 5 秒心跳。
+   上线阶段采用确认机制：节点每 2 秒重发 `NODE_ONLINE`，直到网关向该节点单播 `NODE_ONLINE_ACK`；确认完成后传感器每 2 秒采集并上报，按键和舵机节点每 5 秒发送心跳。
 ## 4. USB CDC 串口测试
 
 网关通过板载 USB 枚举 CDC ACM 虚拟串口。上位机按 `115200 8N1` 打开该 COM 口并置位 DTR，端口只传输一行一个 UTF-8 JSON。当前 `timestamp_ms` 是网关自启动以来的单调毫秒数；接入真实云端或 RTC 后可替换为 Unix 时间戳。
@@ -104,13 +104,13 @@ west flash -d build/gateway --runner nrfjprog --erase
 
 预期现象：
 
-- DHT11 每 5 秒输出 `dht_report`；越界及恢复时各输出一次 `dht_alert`。
+- DHT11 每 2 秒输出 `dht_report`；越界及恢复时各输出一次 `dht_alert`。
 - 按键输入连续稳定 `50 ms` 后才确认变化；一次完整点击正常输出两条 `button_event`，分别为 `pressed` 和 `released`，并每 5 秒输出 `device_heartbeat`。若未按下时轻触导线仍能维持低电平超过 50 ms，应缩短信号线，并在 `SIG` 与 `3.3V` 之间增加约 `10 kΩ` 外部上拉。
 - 舵机命令会先得到 `servo_command_accepted`，随后得到 Mesh 返回的 `servo_result`。
-- pH 节点每 5 秒输出 `ph_report`，包含 `temperature_c`、`ph` 和 `ph_mv`，不产生阈值告警；通信失败时输出一次 `sensor_error`，恢复后输出一次 `sensor_recovered`。
-- DO 节点每 5 秒输出 `do_report`，包含 `dissolved_oxygen_mg_l`、`temperature_c`、`saturation_pct`、`calibration_status_known`、`air_calibrated` 和 `zero_calibrated`；仅校准状态读取失败时两个校准字段为 `null`，测量数据仍正常上报。测量通信失败时输出一次 `sensor_error`，恢复后输出一次 `sensor_recovered`。
-- ORP 节点每 5 秒输出 `orp_report`，包含 `temperature_c`、`orp_mv` 和 `orp_drift_mv`；通信失败时输出一次 `sensor_error`，恢复后输出一次 `sensor_recovered`。
-- 任一节点超过 15 秒未上报，网关输出 `device_offline` 并亮红色告警灯。
+- pH 节点每 2 秒输出 `ph_report`，包含 `temperature_c`、`ph` 和 `ph_mv`，不产生阈值告警；通信失败时输出一次 `sensor_error`，恢复后输出一次 `sensor_recovered`。
+- DO 节点每 2 秒输出 `do_report`，包含 `dissolved_oxygen_mg_l`、`temperature_c`、`saturation_pct`、`calibration_status_known`、`air_calibrated` 和 `zero_calibrated`；仅校准状态读取失败时两个校准字段为 `null`，测量数据仍正常上报。测量通信失败时输出一次 `sensor_error`，恢复后输出一次 `sensor_recovered`。
+- ORP 节点每 2 秒输出 `orp_report`，包含 `temperature_c`、`orp_mv` 和 `orp_drift_mv`；通信失败时输出一次 `sensor_error`，恢复后输出一次 `sensor_recovered`。
+- 任一节点连续 30 秒没有任何有效消息时，网关只为该节点输出一次 `device_offline` 并显示黄色；其他节点继续正常工作。离线节点再次发送有效消息后，网关输出 `device_online`，全部已知节点恢复在线后重新显示绿色。
 - 舵机超过 15 秒未收到网关心跳后停止，随后上报 `safe_stopped`。
 
 ## 5. pH 校准

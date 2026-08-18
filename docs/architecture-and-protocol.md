@@ -10,12 +10,12 @@
 
 | 逻辑 ID | 设备名称 | 板级目标 | 角色 |
 | --- | --- | --- | --- |
-| `BLE_MESH_DHT11` | `DHT11_Node` | `xiao_ble/nrf52840/sense` | 每 5 秒采集并上报温湿度；阈值状态变化时告警。 |
+| `BLE_MESH_DHT11` | `DHT11_Node` | `xiao_ble/nrf52840/sense` | 每 2 秒采集并上报温湿度；阈值状态变化时告警。 |
 | `BLE_MESH_BUTTON` | `Button_Node` | `xiao_ble/nrf52840/sense` | 即时上报按下、松开事件；每 5 秒发送在线心跳。 |
 | `BLE_MESH_SERVO` | `Servo_Node` | `xiao_ble/nrf52840/sense` | 控制连续旋转 SG90 的方向、速度、停止；每 5 秒发送在线心跳。 |
-| `BLE_MESH_PH` | `PH_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 5 秒读取并上报温度、pH 和 pH 毫伏值；支持远程校准。 |
-| `BLE_MESH_DO` | `DO_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 5 秒读取并上报溶解氧、温度、饱和度和校准状态。 |
-| `BLE_MESH_ORP` | `ORP_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 5 秒读取并上报温度、ORP 和 ORP 漂移值。 |
+| `BLE_MESH_PH` | `PH_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 2 秒读取并上报温度、pH 和 pH 毫伏值；支持远程校准。 |
+| `BLE_MESH_DO` | `DO_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 2 秒读取并上报溶解氧、温度、饱和度和校准状态。 |
+| `BLE_MESH_ORP` | `ORP_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 2 秒读取并上报温度、ORP 和 ORP 漂移值。 |
 | `BLE_MESH_GATEWAY` | `Gateway_Node` | `nrf52840dongle/nrf52840` | 管理节点在线状态，通过板载 USB CDC ACM 转换 Mesh 与上位机 JSON，并每 5 秒发送网关心跳。 |
 
 所有设备均开启 Relay。设备数量与距离适用于近距离演示网络，不以低功耗或高吞吐为目标。
@@ -90,14 +90,15 @@ ORP 数值解析规则：
 
 - 节点完成配网或从 Flash 恢复 Mesh 配置后，立即向 `NODE_STATUS_GROUP` 发送 `NODE_ONLINE`；未收到网关确认时每 2 秒重试。
 - 网关收到 `NODE_ONLINE` 后登记节点地址、输出 `device_online` JSON，并向该节点的单播地址回复 `NODE_ONLINE_ACK`。节点收到匹配的 `token` 后停止重试。
-- DHT11 节点每 5 秒发送一次 `DHT_REPORT`。该消息同时视为该节点在线心跳。
+- DHT11 节点每 2 秒发送一次 `DHT_REPORT`。该消息同时视为该节点在线心跳。
 - 按键节点只在输入连续稳定 `50 ms` 后确认状态变化并发送 `BUTTON_EVENT`；一次完整点击正常产生一条 `pressed` 和一条 `released`。节点每 5 秒发送 `NODE_HEARTBEAT`。
 - 舵机节点每 5 秒发送 `NODE_HEARTBEAT`。收到命令后发送 `SERVO_RESULT`。
-- pH 节点每 5 秒读取 Modbus 保持寄存器 `0–2` 并发送 `PH_REPORT`。读取失败时改发带传感器故障位的 `NODE_HEARTBEAT`；恢复后继续上报数据。pH 节点不做阈值告警。
-- DO 节点每 5 秒读取 Modbus 保持寄存器 `0x2001–0x2006`，并尝试读取校准状态寄存器 `0x200F` 后发送 `DO_REPORT`。测量寄存器读取失败或数据超出手册量程时改发带传感器故障位的 `NODE_HEARTBEAT`；仅校准状态读取失败时仍上报测量数据，并将校准状态标记为未知。DO 节点不做阈值告警。
-- ORP 节点每 5 秒读取温度寄存器 `0` 以及 ORP/漂移寄存器 `9–10` 并发送 `ORP_REPORT`。读取失败或数据超出手册量程时改发带传感器故障位的 `NODE_HEARTBEAT`；恢复后继续上报。ORP 节点不做阈值告警。
+- pH 节点每 2 秒读取 Modbus 保持寄存器 `0–2` 并发送 `PH_REPORT`。读取失败时改发带传感器故障位的 `NODE_HEARTBEAT`；恢复后继续上报数据。pH 节点不做阈值告警。
+- DO 节点每 2 秒读取 Modbus 保持寄存器 `0x2001–0x2006`，并尝试读取校准状态寄存器 `0x200F` 后发送 `DO_REPORT`。测量寄存器读取失败或数据超出手册量程时改发带传感器故障位的 `NODE_HEARTBEAT`；仅校准状态读取失败时仍上报测量数据，并将校准状态标记为未知。DO 节点不做阈值告警。
+- ORP 节点每 2 秒读取温度寄存器 `0` 以及 ORP/漂移寄存器 `9–10` 并发送 `ORP_REPORT`。读取失败或数据超出手册量程时改发带传感器故障位的 `NODE_HEARTBEAT`；恢复后继续上报。ORP 节点不做阈值告警。
+- 各节点首次周期任务按设备类型错开 `250 ms`，之后按各自周期运行，减少多节点同时上报造成的信道碰撞。
 - 网关每 5 秒向 `GATEWAY_HEARTBEAT_GROUP` 发送 `GATEWAY_HEARTBEAT`。
-- 网关连续 15 秒未收到某功能节点的有效上报时，标记该节点离线。
+- 网关连续 30 秒未收到某功能节点的任何有效消息时，才确认该节点离线；任意有效消息到达后立即恢复在线。
 - 舵机节点连续 15 秒未收到有效网关心跳时，立即输出校准后的停止脉宽并上报安全停止结果；Mesh 恢复后等待新的控制命令。
 - 温度在 `30–35°C`（含边界）以及湿度在 `60–80%`（含边界）时为正常。DHT11 只在进入异常和恢复正常时发送 `DHT_ALERT`。
 
@@ -211,7 +212,7 @@ pH 校准：
 | 传感器读取失败、网关超时或 Mesh 故障 | 红色闪烁 |
 | 舵机因网关超时停止 | 红色快闪 |
 
-网关在任一节点离线时显示红色告警，并在该节点恢复上报后恢复绿色在线状态。
+网关自身初始化或 Mesh 初始化失败时显示红色；网关正常但存在已知离线节点时显示黄色；所有当前已知节点在线时显示绿色。单个节点离线不会阻断其他节点收发。
 
 ## 8. 硬件约束
 
