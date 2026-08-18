@@ -10,6 +10,7 @@ struct app_node_config {
 	enum app_device_type device_type;
 	void (*periodic)(void);
 	void (*gateway_timeout)(void);
+	uint32_t periodic_interval_ms;
 };
 
 int app_node_init(const struct app_node_config *config);

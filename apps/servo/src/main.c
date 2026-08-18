@@ -176,6 +176,7 @@ static const struct app_node_config node_config = {
 	.device_type = APP_DEVICE_SERVO,
 	.periodic = send_heartbeat,
 	.gateway_timeout = gateway_timeout,
+	.periodic_interval_ms = APP_NODE_HEARTBEAT_INTERVAL_MS,
 };
 
 int main(void)

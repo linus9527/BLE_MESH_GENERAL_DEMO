@@ -147,7 +147,7 @@ static bool any_known_device_offline_locked(void)
 
 static void refresh_gateway_led_locked(void)
 {
-	app_led_set(any_known_device_offline_locked() ? APP_LED_ERROR : APP_LED_ONLINE);
+	app_led_set(any_known_device_offline_locked() ? APP_LED_WARNING : APP_LED_ONLINE);
 }
 
 static struct tracked_device *mark_device_seen(enum app_device_type type, uint16_t mesh_address)
@@ -211,7 +211,8 @@ static void gateway_heartbeat_handler(struct k_work *work)
 {
 	ARG_UNUSED(work);
 	(void)app_mesh_send_gateway_heartbeat(gateway_sequence++);
-	(void)k_work_reschedule(&gateway_heartbeat_work, K_MSEC(APP_HEARTBEAT_INTERVAL_MS));
+	(void)k_work_reschedule(&gateway_heartbeat_work,
+				K_MSEC(APP_GATEWAY_HEARTBEAT_INTERVAL_MS));
 }
 
 static void device_liveness_handler(struct k_work *work)
@@ -223,14 +224,16 @@ static void device_liveness_handler(struct k_work *work)
 	for (size_t index = 0; index < ARRAY_SIZE(devices); index++) {
 		struct tracked_device *device = &devices[index];
 
-		if (!device->online || now - device->last_seen_ms < APP_OFFLINE_TIMEOUT_MS) {
+		if (!device->online ||
+		    now - device->last_seen_ms < APP_NODE_OFFLINE_TIMEOUT_MS) {
 			continue;
 		}
 
 		device->online = false;
 		device->sensor_error_active = false;
 		emit_json("{\"type\":\"device_offline\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"timeout_ms\":%d,\"timestamp_ms\":%lld}",
-			  device->id, device->name, device->mesh_address, APP_OFFLINE_TIMEOUT_MS,
+			  device->id, device->name, device->mesh_address,
+			  APP_NODE_OFFLINE_TIMEOUT_MS,
 			  (long long)now);
 	}
 

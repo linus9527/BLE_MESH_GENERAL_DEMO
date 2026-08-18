@@ -168,6 +168,7 @@ static const struct app_mesh_callbacks mesh_callbacks = {
 static const struct app_node_config node_config = {
 	.device_type = APP_DEVICE_DO,
 	.periodic = request_sample,
+	.periodic_interval_ms = APP_SENSOR_REPORT_INTERVAL_MS,
 };
 
 int main(void)
