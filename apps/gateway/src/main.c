@@ -10,9 +10,11 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/usb/usb_device.h>
 
 #include "app_led.h"
 #include "app_mesh.h"
@@ -20,6 +22,7 @@
 
 #define SERIAL_LINE_MAX 192
 #define SERIAL_RX_QUEUE_SIZE 256
+#define SERIAL_CONNECTION_POLL_MS 100
 
 struct tracked_device {
 	enum app_device_type type;
@@ -37,10 +40,15 @@ static struct tracked_device devices[] = {
 	{ APP_DEVICE_BUTTON, "BLE_MESH_BUTTON", "Button_Node" },
 	{ APP_DEVICE_SERVO, "BLE_MESH_SERVO", "Servo_Node" },
 	{ APP_DEVICE_PH, "BLE_MESH_PH", "PH_Node" },
+	{ APP_DEVICE_DO, "BLE_MESH_DO", "DO_Node" },
+	{ APP_DEVICE_ORP, "BLE_MESH_ORP", "ORP_Node" },
 };
 
 static const struct device *const serial = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
-static bool serial_ready;
+BUILD_ASSERT(DT_NODE_HAS_COMPAT(DT_CHOSEN(zephyr_console), zephyr_cdc_acm_uart),
+	     "Gateway serial device must be USB CDC ACM");
+static atomic_t serial_ready;
+static atomic_t gateway_provisioned;
 static uint8_t gateway_sequence;
 static uint8_t command_sequence;
 
@@ -50,8 +58,10 @@ K_MUTEX_DEFINE(device_mutex);
 
 static void gateway_heartbeat_handler(struct k_work *work);
 static void device_liveness_handler(struct k_work *work);
+static void serial_connection_handler(struct k_work *work);
 K_WORK_DELAYABLE_DEFINE(gateway_heartbeat_work, gateway_heartbeat_handler);
 K_WORK_DELAYABLE_DEFINE(device_liveness_work, device_liveness_handler);
+K_WORK_DELAYABLE_DEFINE(serial_connection_work, serial_connection_handler);
 
 static int64_t timestamp_ms(void)
 {
@@ -64,7 +74,7 @@ static void emit_json(const char *format, ...)
 	va_list arguments;
 	int length;
 
-	if (!serial_ready) {
+	if (!atomic_get(&serial_ready)) {
 		return;
 	}
 
@@ -82,6 +92,35 @@ static void emit_json(const char *format, ...)
 	}
 	uart_poll_out(serial, '\n');
 	k_mutex_unlock(&serial_tx_mutex);
+}
+
+static void emit_gateway_online(void)
+{
+	emit_json("{\"type\":\"gateway_online\",\"device_id\":\"BLE_MESH_GATEWAY\",\"device_name\":\"Gateway_Node\",\"timestamp_ms\":%lld}",
+		  (long long)timestamp_ms());
+}
+
+static void serial_connection_handler(struct k_work *work)
+{
+	uint32_t dtr = 0U;
+	bool connected;
+	bool was_connected;
+
+	ARG_UNUSED(work);
+	connected = uart_line_ctrl_get(serial, UART_LINE_CTRL_DTR, &dtr) == 0 && dtr != 0U;
+	was_connected = atomic_get(&serial_ready) != 0;
+
+	if (connected && !was_connected) {
+		atomic_set(&serial_ready, 1);
+		if (atomic_get(&gateway_provisioned)) {
+			emit_gateway_online();
+		}
+	} else if (!connected && was_connected) {
+		atomic_clear(&serial_ready);
+	}
+
+	(void)k_work_reschedule(&serial_connection_work,
+				K_MSEC(SERIAL_CONNECTION_POLL_MS));
 }
 
 static struct tracked_device *device_for_type(enum app_device_type type)
@@ -311,11 +350,13 @@ static void mesh_message_received(const struct app_mesh_message *message)
 			  device->id, device->name, device->mesh_address, message->payload[2],
 			  (long long)timestamp_ms());
 		if (message->payload[1] == APP_DEVICE_DHT11 ||
-		    message->payload[1] == APP_DEVICE_PH) {
+		    message->payload[1] == APP_DEVICE_PH ||
+		    message->payload[1] == APP_DEVICE_DO ||
+		    message->payload[1] == APP_DEVICE_ORP) {
 			update_sensor_error(
 				device, (message->payload[2] & APP_NODE_STATE_SENSOR_ERROR) != 0U,
-				message->payload[1] == APP_DEVICE_PH ? "modbus_read_failed" :
-								      "read_failed");
+				message->payload[1] == APP_DEVICE_DHT11 ? "read_failed" :
+									 "modbus_read_failed");
 		}
 		break;
 	case APP_OPCODE_DHT_REPORT:
@@ -388,6 +429,58 @@ static void mesh_message_received(const struct app_mesh_message *message)
 			  ph_calibration_result_name(message->payload[2]),
 			  (long long)timestamp_ms());
 		break;
+	case APP_OPCODE_DO_REPORT: {
+		char dissolved_oxygen[16];
+		char temperature[16];
+		uint8_t calibration_flags = message->payload[6];
+		bool calibration_status_known =
+			(calibration_flags & APP_DO_CALIBRATION_STATUS_KNOWN) != 0U;
+
+		device = mark_device_seen(APP_DEVICE_DO, message->source);
+		if (device == NULL) {
+			return;
+		}
+		update_sensor_error(device, false, "modbus_read_failed");
+		format_fixed_2(dissolved_oxygen, sizeof(dissolved_oxygen),
+			       (int16_t)sys_get_le16(&message->payload[1]));
+		format_fixed_1(temperature, sizeof(temperature),
+			       (int16_t)sys_get_le16(&message->payload[3]));
+		emit_json("{\"type\":\"do_report\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"dissolved_oxygen_mg_l\":%s,\"temperature_c\":%s,\"saturation_pct\":%u,\"calibration_status_known\":%s,\"air_calibrated\":%s,\"zero_calibrated\":%s,\"timestamp_ms\":%lld}",
+			  device->id, device->name, device->mesh_address, dissolved_oxygen,
+			  temperature, message->payload[5],
+			  calibration_status_known ? "true" : "false",
+			  calibration_status_known ?
+				(calibration_flags & APP_DO_CALIBRATION_AIR_COMPLETE ? "true" :
+										     "false") :
+				"null",
+			  calibration_status_known ?
+				(calibration_flags & APP_DO_CALIBRATION_ZERO_COMPLETE ? "true" :
+										      "false") :
+				"null",
+			  (long long)timestamp_ms());
+		break;
+	}
+	case APP_OPCODE_ORP_REPORT: {
+		char temperature[16];
+		char orp[16];
+		char drift[16];
+
+		device = mark_device_seen(APP_DEVICE_ORP, message->source);
+		if (device == NULL) {
+			return;
+		}
+		update_sensor_error(device, false, "modbus_read_failed");
+		format_fixed_1(temperature, sizeof(temperature),
+			       (int16_t)sys_get_le16(&message->payload[1]));
+		format_fixed_1(orp, sizeof(orp),
+			       (int16_t)sys_get_le16(&message->payload[3]));
+		format_fixed_1(drift, sizeof(drift),
+			       (int16_t)sys_get_le16(&message->payload[5]));
+		emit_json("{\"type\":\"orp_report\",\"device_id\":\"%s\",\"device_name\":\"%s\",\"mesh_addr\":\"0x%04x\",\"temperature_c\":%s,\"orp_mv\":%s,\"orp_drift_mv\":%s,\"timestamp_ms\":%lld}",
+			  device->id, device->name, device->mesh_address, temperature, orp,
+			  drift, (long long)timestamp_ms());
+		break;
+	}
 	default:
 		break;
 	}
@@ -396,8 +489,8 @@ static void mesh_message_received(const struct app_mesh_message *message)
 static void mesh_provisioned(void)
 {
 	app_led_set(APP_LED_ONLINE);
-	emit_json("{\"type\":\"gateway_online\",\"device_id\":\"BLE_MESH_GATEWAY\",\"device_name\":\"Gateway_Node\",\"timestamp_ms\":%lld}",
-		  (long long)timestamp_ms());
+	atomic_set(&gateway_provisioned, 1);
+	emit_gateway_online();
 	(void)k_work_reschedule(&gateway_heartbeat_work, K_NO_WAIT);
 	(void)k_work_reschedule(&device_liveness_work, K_SECONDS(1));
 }
@@ -406,6 +499,7 @@ static void mesh_reset(void)
 {
 	(void)k_work_cancel_delayable(&gateway_heartbeat_work);
 	(void)k_work_cancel_delayable(&device_liveness_work);
+	atomic_clear(&gateway_provisioned);
 	k_mutex_lock(&device_mutex, K_FOREVER);
 	for (size_t index = 0; index < ARRAY_SIZE(devices); index++) {
 		devices[index].known = false;
@@ -639,13 +733,25 @@ static void serial_interrupt_handler(const struct device *device, void *user_dat
 
 static int serial_init(void)
 {
+	int err;
+
 	if (!device_is_ready(serial)) {
 		return -ENODEV;
 	}
 
-	serial_ready = true;
-	uart_irq_callback_user_data_set(serial, serial_interrupt_handler, NULL);
+	err = usb_enable(NULL);
+	if (err && err != -EALREADY) {
+		return err;
+	}
+
+	err = uart_irq_callback_user_data_set(serial, serial_interrupt_handler, NULL);
+	if (err) {
+		return err;
+	}
+
 	uart_irq_rx_enable(serial);
+	(void)k_work_reschedule(&serial_connection_work,
+				K_MSEC(SERIAL_CONNECTION_POLL_MS));
 	return 0;
 }
 
