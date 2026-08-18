@@ -47,5 +47,10 @@ int app_mesh_send_ph_calibration(uint16_t destination,
 int app_mesh_send_ph_calibration_result(enum app_ph_calibration_point point,
 					enum app_ph_calibration_result result,
 					uint8_t sequence);
+int app_mesh_send_do_report(uint16_t dissolved_oxygen_x100, int16_t temperature_x10,
+			    uint8_t saturation_pct, uint8_t calibration_flags,
+			    uint8_t sequence);
+int app_mesh_send_orp_report(int16_t temperature_x10, int16_t orp_x10,
+			     int16_t drift_x10, uint8_t sequence);
 
 #endif

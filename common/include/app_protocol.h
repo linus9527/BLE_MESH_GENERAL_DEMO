@@ -24,6 +24,8 @@ enum app_device_type {
 	APP_DEVICE_BUTTON = 2,
 	APP_DEVICE_SERVO = 3,
 	APP_DEVICE_PH = 4,
+	APP_DEVICE_DO = 5,
+	APP_DEVICE_ORP = 6,
 };
 
 enum app_node_state_flag {
@@ -47,6 +49,8 @@ enum app_opcode {
 	APP_OPCODE_PH_REPORT = 0x0b,
 	APP_OPCODE_PH_CALIBRATE = 0x0c,
 	APP_OPCODE_PH_CALIBRATION_RESULT = 0x0d,
+	APP_OPCODE_DO_REPORT = 0x0e,
+	APP_OPCODE_ORP_REPORT = 0x0f,
 };
 
 enum app_dht_metric {
@@ -90,6 +94,12 @@ enum app_ph_calibration_result {
 	APP_PH_CALIBRATION_SUCCESS = 1,
 	APP_PH_CALIBRATION_COMMUNICATION_ERROR = 2,
 	APP_PH_CALIBRATION_REJECTED = 3,
+};
+
+enum app_do_calibration_flag {
+	APP_DO_CALIBRATION_AIR_COMPLETE = BIT(0),
+	APP_DO_CALIBRATION_ZERO_COMPLETE = BIT(1),
+	APP_DO_CALIBRATION_STATUS_KNOWN = BIT(7),
 };
 
 #define APP_MESH_OP(code) BT_MESH_MODEL_OP_3(code, APP_VENDOR_COMPANY_ID)
