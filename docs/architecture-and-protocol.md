@@ -2,7 +2,7 @@
 
 ## 1. 范围
 
-本项目使用 nRF Connect SDK 2.9.3 与 Zephyr Bluetooth Mesh，在五块 nRF52840 开发板上实现本地物联演示。电脑串口终端暂时模拟云端；网关是 Mesh 和云端接口之间的唯一边界。
+本项目使用 nRF Connect SDK 2.9.3 与 Zephyr Bluetooth Mesh，在七块 nRF52840 开发板上实现本地物联演示。电脑上位机通过 USB CDC 虚拟串口暂时模拟云端；网关是 Mesh 和云端接口之间的唯一边界。
 
 首次配网、AppKey 绑定、发布地址与订阅地址配置由 Nordic nRF Mesh App 完成。网关不承担 Provisioner 角色。
 
@@ -14,21 +14,25 @@
 | `BLE_MESH_BUTTON` | `Button_Node` | `xiao_ble/nrf52840/sense` | 即时上报按下、松开事件；每 5 秒发送在线心跳。 |
 | `BLE_MESH_SERVO` | `Servo_Node` | `xiao_ble/nrf52840/sense` | 控制连续旋转 SG90 的方向、速度、停止；每 5 秒发送在线心跳。 |
 | `BLE_MESH_PH` | `PH_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 5 秒读取并上报温度、pH 和 pH 毫伏值；支持远程校准。 |
-| `BLE_MESH_GATEWAY` | `Gateway_Node` | `nrf52840_mdk/nrf52840` | 管理节点在线状态，转换 Mesh 与串口 JSON，并每 5 秒发送网关心跳。 |
+| `BLE_MESH_DO` | `DO_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 5 秒读取并上报溶解氧、温度、饱和度和校准状态。 |
+| `BLE_MESH_ORP` | `ORP_Node` | `xiao_ble/nrf52840/sense` | 使用 Zephyr 官方 Modbus RTU Client API，每 5 秒读取并上报温度、ORP 和 ORP 漂移值。 |
+| `BLE_MESH_GATEWAY` | `Gateway_Node` | `nrf52840dongle/nrf52840` | 管理节点在线状态，通过板载 USB CDC ACM 转换 Mesh 与上位机 JSON，并每 5 秒发送网关心跳。 |
 
 所有设备均开启 Relay。设备数量与距离适用于近距离演示网络，不以低功耗或高吞吐为目标。
 
 ## 3. 网络拓扑
 
 ```text
-nRF Mesh App -- 首次配网和模型配置 --> 全部五个设备
+nRF Mesh App -- 首次配网和模型配置 --> 全部七个设备
 
-DHT11_Node --- 状态、温湿度、告警 ---> Gateway_Node --- JSON ---> 串口终端
-Button_Node -- 状态、按键事件、告警 --> Gateway_Node --- JSON ---> 串口终端
-Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- JSON ---> 串口终端
-PH_Node ------ 状态、pH/温度/mV ------> Gateway_Node --- JSON ---> 串口终端
-串口终端 ------ 舵机 JSON 控制命令 ----> Gateway_Node --- Mesh ---> Servo_Node
-串口终端 ------ pH JSON 校准命令 -----> Gateway_Node --- Mesh ---> PH_Node
+DHT11_Node --- 状态、温湿度、告警 ---> Gateway_Node --- USB CDC JSON ---> 上位机
+Button_Node -- 状态、按键事件、告警 --> Gateway_Node --- USB CDC JSON ---> 上位机
+Servo_Node --- 状态、执行结果、告警 ---> Gateway_Node --- USB CDC JSON ---> 上位机
+PH_Node ------ 状态、pH/温度/mV ------> Gateway_Node --- USB CDC JSON ---> 上位机
+DO_Node ------ 状态、DO/温度/饱和度 ---> Gateway_Node --- USB CDC JSON ---> 上位机
+ORP_Node ----- 状态、ORP/温度/漂移 ----> Gateway_Node --- USB CDC JSON ---> 上位机
+上位机 -------- 舵机 JSON 控制命令 ----> Gateway_Node --- Mesh ---> Servo_Node
+上位机 -------- pH JSON 校准命令 -----> Gateway_Node --- Mesh ---> PH_Node
 ```
 
 每个应用消息使用 Vendor Model：Company ID `0xFFFF`、Model ID `0x0001`。旧版曾把 `0xFFFF` 当成自定义 SIG Model，并使用 `0x8001–0x800A` 操作码；这些值与 Configuration Foundation 消息冲突，会导致上线通知、确认和校准等消息被配置服务器截获。本版改用三字节 Vendor opcode。`0xFFFF` 仅用于原型，产品化时必须替换为正式分配的 Bluetooth SIG Company ID。
@@ -37,9 +41,9 @@ PH_Node ------ 状态、pH/温度/mV ------> Gateway_Node --- JSON ---> 串口�
 
 | 地址 | 名称 | 发布者 | 订阅者 | 用途 |
 | --- | --- | --- | --- | --- |
-| `0xC000` | `NODE_STATUS_GROUP` | 四个功能节点 | 网关 | 节点状态、传感器、按键、舵机执行结果和 pH 校准结果。 |
+| `0xC000` | `NODE_STATUS_GROUP` | 六个功能节点 | 网关 | 节点状态、传感器、按键、舵机执行结果和 pH 校准结果。 |
 | `0xC001` | `SERVO_CONTROL_GROUP` | 网关 | 舵机节点 | 舵机运行、停止、校准命令。 |
-| `0xC002` | `GATEWAY_HEARTBEAT_GROUP` | 网关 | 四个功能节点 | 网关在线心跳和舵机安全停止判定。 |
+| `0xC002` | `GATEWAY_HEARTBEAT_GROUP` | 网关 | 六个功能节点 | 网关在线心跳和舵机安全停止判定。 |
 
 源单播地址由 Mesh 网络头提供。网关将它格式化为 JSON 中的 `mesh_addr`。
 
@@ -62,10 +66,19 @@ PH_Node ------ 状态、pH/温度/mV ------> Gateway_Node --- JSON ---> 串口�
 | `0x0B` | `PH_REPORT` | pH 节点 -> 网关 | `version`, `temperature_x10`, `ph_x100`, `ph_mv_x10`, `sequence` |
 | `0x0C` | `PH_CALIBRATE` | 网关 -> pH 节点单播 | `version`, `point`, `sequence` |
 | `0x0D` | `PH_CALIBRATION_RESULT` | pH 节点 -> 网关 | `version`, `point`, `result`, `sequence` |
+| `0x0E` | `DO_REPORT` | DO 节点 -> 网关 | `version`, `dissolved_oxygen_x100`, `temperature_x10`, `saturation_pct`, `calibration_flags`, `sequence` |
+| `0x0F` | `ORP_REPORT` | ORP 节点 -> 网关 | `version`, `temperature_x10`, `orp_x10`, `drift_x10`, `sequence` |
+
+ORP 数值解析规则：
+
+- Modbus 寄存器返回高字节在前，先组合为 16 位原始值，再按有符号 `int16_t` 解释。
+- 温度、ORP 和 ORP 漂移的权重均为 `0.1`，即 `实际值 = 有符号原始值 / 10.0`。
+- 例如数据字节 `07 26` 组合为 `0x0726 = 1830`，ORP 为 `183.0 mV`；数据字节 `FF 9C` 解释为 `-100`，ORP 为 `-10.0 mV`。
+- Mesh 中的 `temperature_x10`、`orp_x10` 和 `drift_x10` 使用有符号 16 位小端格式传输，网关换算后输出带一位小数的 JSON。
 
 枚举值：
 
-- `device_type`：`1` DHT11，`2` 按键，`3` 舵机，`4` pH。
+- `device_type`：`1` DHT11，`2` 按键，`3` 舵机，`4` pH，`5` 溶解氧，`6` ORP。
 - `state_flags`：位 `0` 已配网，位 `1` 网关可达，位 `2` 设备告警，位 `3` 传感器读取故障。
 - `metric`：`1` 温度，`2` 湿度。
 - `state`：`1` 进入异常，`2` 恢复正常。
@@ -81,14 +94,16 @@ PH_Node ------ 状态、pH/温度/mV ------> Gateway_Node --- JSON ---> 串口�
 - 按键节点只在输入连续稳定 `50 ms` 后确认状态变化并发送 `BUTTON_EVENT`；一次完整点击正常产生一条 `pressed` 和一条 `released`。节点每 5 秒发送 `NODE_HEARTBEAT`。
 - 舵机节点每 5 秒发送 `NODE_HEARTBEAT`。收到命令后发送 `SERVO_RESULT`。
 - pH 节点每 5 秒读取 Modbus 保持寄存器 `0–2` 并发送 `PH_REPORT`。读取失败时改发带传感器故障位的 `NODE_HEARTBEAT`；恢复后继续上报数据。pH 节点不做阈值告警。
+- DO 节点每 5 秒读取 Modbus 保持寄存器 `0x2001–0x2006`，并尝试读取校准状态寄存器 `0x200F` 后发送 `DO_REPORT`。测量寄存器读取失败或数据超出手册量程时改发带传感器故障位的 `NODE_HEARTBEAT`；仅校准状态读取失败时仍上报测量数据，并将校准状态标记为未知。DO 节点不做阈值告警。
+- ORP 节点每 5 秒读取温度寄存器 `0` 以及 ORP/漂移寄存器 `9–10` 并发送 `ORP_REPORT`。读取失败或数据超出手册量程时改发带传感器故障位的 `NODE_HEARTBEAT`；恢复后继续上报。ORP 节点不做阈值告警。
 - 网关每 5 秒向 `GATEWAY_HEARTBEAT_GROUP` 发送 `GATEWAY_HEARTBEAT`。
 - 网关连续 15 秒未收到某功能节点的有效上报时，标记该节点离线。
 - 舵机节点连续 15 秒未收到有效网关心跳时，立即输出校准后的停止脉宽并上报安全停止结果；Mesh 恢复后等待新的控制命令。
 - 温度在 `30–35°C`（含边界）以及湿度在 `60–80%`（含边界）时为正常。DHT11 只在进入异常和恢复正常时发送 `DHT_ALERT`。
 
-## 6. 串口 JSON 协议
+## 6. USB CDC JSON 协议
 
-串口使用 `115200 8N1`。每条输入和输出均是单行 UTF-8 JSON；网关不会在同一串口输出 Zephyr 调试日志。`timestamp_ms` 由网关在输出时添加；当前实现使用网关自启动以来的单调毫秒数，接入真实云端或 RTC 后可替换为 Unix 时间戳。
+nRF52840 Dongle 通过板载 USB 枚举为 CDC ACM 虚拟串口，上位机按 `115200 8N1` 打开对应 COM 口。每条输入和输出均是单行 UTF-8 JSON；网关不会在该端口输出 Zephyr 调试日志。上位机打开端口并置位 DTR 后，网关输出 `gateway_online`，因此不需要额外的 USB-TTL 转换器。`timestamp_ms` 由网关在输出时添加；当前实现使用网关自启动以来的单调毫秒数，接入真实云端或 RTC 后可替换为 Unix 时间戳。
 
 ### 6.1 网关输出
 
@@ -124,12 +139,26 @@ pH 定时上报：
 {"type":"ph_report","device_id":"BLE_MESH_PH","device_name":"PH_Node","mesh_addr":"0x0008","temperature_c":25.0,"ph":7.00,"ph_mv":0.6,"timestamp_ms":1730000025000}
 ```
 
+溶解氧定时上报：
+
+```json
+{"type":"do_report","device_id":"BLE_MESH_DO","device_name":"DO_Node","mesh_addr":"0x0009","dissolved_oxygen_mg_l":8.35,"temperature_c":25.0,"saturation_pct":96,"air_calibrated":true,"zero_calibrated":false,"timestamp_ms":1730000025000}
+```
+
+ORP 定时上报：
+
+```json
+{"type":"orp_report","device_id":"BLE_MESH_ORP","device_name":"ORP_Node","mesh_addr":"0x000a","temperature_c":25.0,"orp_mv":235.6,"orp_drift_mv":1.2,"timestamp_ms":1730000025000}
+```
+
 设备离线、读取故障与舵机执行结果：
 
 ```json
 {"type":"device_offline","device_id":"BLE_MESH_SERVO","device_name":"Servo_Node","mesh_addr":"0x0007","timeout_ms":15000,"timestamp_ms":1730000035000}
 {"type":"sensor_error","device_id":"BLE_MESH_DHT11","device_name":"DHT11_Node","mesh_addr":"0x0005","error":"read_failed","timestamp_ms":1730000040000}
 {"type":"sensor_error","device_id":"BLE_MESH_PH","device_name":"PH_Node","mesh_addr":"0x0008","error":"modbus_read_failed","timestamp_ms":1730000041000}
+{"type":"sensor_error","device_id":"BLE_MESH_DO","device_name":"DO_Node","mesh_addr":"0x0009","error":"modbus_read_failed","timestamp_ms":1730000042000}
+{"type":"sensor_error","device_id":"BLE_MESH_ORP","device_name":"ORP_Node","mesh_addr":"0x000a","error":"modbus_read_failed","timestamp_ms":1730000043000}
 {"type":"servo_result","device_id":"BLE_MESH_SERVO","device_name":"Servo_Node","mesh_addr":"0x0007","result":"executed","direction":"forward","speed_pct":60,"timestamp_ms":1730000045000}
 ```
 
@@ -191,14 +220,16 @@ pH 校准：
 - SG90 使用独立、至少 `1 A` 的 `5 V` 电源。舵机电源地和 XIAO GND 必须共地。
 - 连续旋转 SG90 无角度反馈，只提供正转、反转、速度和停止控制。默认停止脉宽为 `1500 us`，可通过串口命令校准并持久化保存。
 - MIK-PH-8001 电极使用独立 `12 V DC` 电源，默认 Modbus 地址 `1`、`9600 8N1`。电极电源地、XIAO GND 和 RS485 GND 必须共地；不得把 `12 V` 接到 XIAO-RS485 的 `5V` 端子。
-- XIAO-RS485 使用 `D4/P0.04` 发送、`D5/P0.05` 接收、`D2/P0.28` 控制 `DE/RE`；高电平发送、低电平接收。
-- pH 节点通过 Zephyr `zephyr,modbus-serial` 驱动管理 RTU 帧间隔、CRC、接收超时及 `DE` 收发切换，业务代码调用 `modbus_read_holding_regs()` 和 `modbus_write_holding_reg()`，不自行拼接 Modbus 帧。
+- MIK-DO-7019 电极使用独立 `12 V DC` 电源，默认 Modbus 地址 `1`、`9600 8N1`。读取范围按手册限制为 `0–20.00 mg/L`、`0–200%` 和 `0–50.0°C`；未校准时允许读数，但空气校准状态未置位会显示黄色警告。
+- MIK-ORP-8001 电极使用 `6–30 V DC` 供电，典型为 `12 V DC`，默认 Modbus 地址 `1`、`9600 8N1`。读取范围按手册限制为 `-1000.0–1000.0 mV`，温度范围为 `0–60.0°C`。
+- DO 和 ORP 节点的 XIAO-RS485 使用 `D4/P0.04` 发送、`D5/P0.05` 接收、`D2/P0.28` 控制 `DE/RE`；高电平发送、低电平接收。
+- pH、DO 和 ORP 节点通过 Zephyr `zephyr,modbus-serial` 驱动管理 RTU 帧间隔、CRC、接收超时及 `DE` 收发切换，业务代码调用官方 Modbus API，不自行拼接 Modbus 帧。DO 和 ORP 节点关闭 UART 控制台，确保 UART0 只用于 RS485。
 - 所有 Mesh 配网状态和舵机停止脉宽均持久化到 Flash。设备和网关重启后无需重新配网。
 
 ## 9. 后续实现顺序
 
-1. 为网关和四种节点创建共用 Vendor Model 库。
-2. 先实现配网、持久化、LED、心跳和串口 JSON。
-3. 分别接入 DHT11、按键、SG90 和 RS485 pH 电极驱动。
-4. 使用 nRF Mesh App 完成五设备配网、AppKey 绑定与组地址配置。
-5. 按串口 JSON 用例完成五设备联调。
+1. 为网关和六种节点创建共用 Vendor Model 库。
+2. 先实现配网、持久化、LED、心跳和 USB CDC JSON。
+3. 分别接入 DHT11、按键、SG90、RS485 pH、RS485 DO 和 RS485 ORP 电极驱动。
+4. 使用 nRF Mesh App 完成七设备配网、AppKey 绑定与组地址配置。
+5. 按 USB CDC JSON 用例完成七设备联调。

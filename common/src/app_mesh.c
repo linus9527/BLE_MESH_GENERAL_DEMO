@@ -61,6 +61,8 @@ APP_MESSAGE_HANDLER(node_online_ack_received, APP_OPCODE_NODE_ONLINE_ACK)
 APP_MESSAGE_HANDLER(ph_report_received, APP_OPCODE_PH_REPORT)
 APP_MESSAGE_HANDLER(ph_calibrate_received, APP_OPCODE_PH_CALIBRATE)
 APP_MESSAGE_HANDLER(ph_calibration_result_received, APP_OPCODE_PH_CALIBRATION_RESULT)
+APP_MESSAGE_HANDLER(do_report_received, APP_OPCODE_DO_REPORT)
+APP_MESSAGE_HANDLER(orp_report_received, APP_OPCODE_ORP_REPORT)
 
 static const struct bt_mesh_model_op application_model_ops[] = {
 	{ APP_MESH_OP(APP_OPCODE_NODE_HEARTBEAT), BT_MESH_LEN_EXACT(4), node_heartbeat_received },
@@ -77,6 +79,8 @@ static const struct bt_mesh_model_op application_model_ops[] = {
 	{ APP_MESH_OP(APP_OPCODE_PH_CALIBRATE), BT_MESH_LEN_EXACT(3), ph_calibrate_received },
 	{ APP_MESH_OP(APP_OPCODE_PH_CALIBRATION_RESULT), BT_MESH_LEN_EXACT(4),
 	  ph_calibration_result_received },
+	{ APP_MESH_OP(APP_OPCODE_DO_REPORT), BT_MESH_LEN_EXACT(8), do_report_received },
+	{ APP_MESH_OP(APP_OPCODE_ORP_REPORT), BT_MESH_LEN_EXACT(8), orp_report_received },
 	BT_MESH_MODEL_OP_END,
 };
 
@@ -319,4 +323,30 @@ int app_mesh_send_ph_calibration_result(enum app_ph_calibration_point point,
 
 	return send_message(APP_OPCODE_PH_CALIBRATION_RESULT, APP_GROUP_NODE_STATUS, payload,
 			    sizeof(payload));
+}
+
+int app_mesh_send_do_report(uint16_t dissolved_oxygen_x100, int16_t temperature_x10,
+			    uint8_t saturation_pct, uint8_t calibration_flags,
+			    uint8_t sequence)
+{
+	uint8_t payload[8] = { APP_PROTOCOL_VERSION };
+
+	sys_put_le16(dissolved_oxygen_x100, &payload[1]);
+	sys_put_le16((uint16_t)temperature_x10, &payload[3]);
+	payload[5] = saturation_pct;
+	payload[6] = calibration_flags;
+	payload[7] = sequence;
+	return send_message(APP_OPCODE_DO_REPORT, APP_GROUP_NODE_STATUS, payload, sizeof(payload));
+}
+
+int app_mesh_send_orp_report(int16_t temperature_x10, int16_t orp_x10,
+			     int16_t drift_x10, uint8_t sequence)
+{
+	uint8_t payload[8] = { APP_PROTOCOL_VERSION };
+
+	sys_put_le16((uint16_t)temperature_x10, &payload[1]);
+	sys_put_le16((uint16_t)orp_x10, &payload[3]);
+	sys_put_le16((uint16_t)drift_x10, &payload[5]);
+	payload[7] = sequence;
+	return send_message(APP_OPCODE_ORP_REPORT, APP_GROUP_NODE_STATUS, payload, sizeof(payload));
 }
