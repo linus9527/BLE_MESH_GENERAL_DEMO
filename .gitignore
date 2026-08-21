@@ -5,3 +5,12 @@ build/
 *.map
 /output/
 /tmp/
+/network-check.txt
+/node-red/node_modules/
+/node-red/.env
+/node-red/.config.*
+/node-red/.flows.json.backup
+/node-red/flows_cred.json
+/node-red/runtime*.log
+/node-red/data/
+/.pnpm-store/

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_ROOT="${BLE_MESH_GATEWAY_ROOT:-$SCRIPT_DIR}"
+APP_DIR="$INSTALL_ROOT/app"
+RUNTIME_DIR="$INSTALL_ROOT/runtime"
+DATA_DIR="${HISTORY_DATA_DIR_ROOT:-/var/lib/ble-mesh-gateway}"
+ENV_FILE="/etc/ble-mesh-gateway/ble-mesh-gateway.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+    set -a
+    . "$ENV_FILE"
+    set +a
+fi
+
+DATA_DIR="${HISTORY_DATA_DIR_ROOT:-/var/lib/ble-mesh-gateway}"
+export SERIAL_PORT="${SERIAL_PORT:-auto}"
+export HISTORY_DATA_DIR="${HISTORY_DATA_DIR:-$DATA_DIR/data}"
+export HISTORY_DB="${HISTORY_DB:-$HISTORY_DATA_DIR/sensor-history.sqlite}"
+export NODE_RED_HOST="${NODE_RED_HOST:-0.0.0.0}"
+export PORT="${PORT:-1880}"
+export HOME="${HOME:-$DATA_DIR}"
+export PATH="$RUNTIME_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+mkdir -p "$HISTORY_DATA_DIR"
+
+if [[ -x "$RUNTIME_DIR/bin/node" ]]; then
+    NODE_BIN="$RUNTIME_DIR/bin/node"
+elif command -v node >/dev/null 2>&1; then
+    NODE_BIN="$(command -v node)"
+else
+    echo "未找到 Node.js 运行时，请先执行 sudo bash ./install.sh。" >&2
+    exit 1
+fi
+
+if [[ ! -f "$APP_DIR/scripts/start.js" ]]; then
+    echo "未找到 Node-RED 启动器：$APP_DIR/scripts/start.js" >&2
+    exit 1
+fi
+
+if [[ ! -d "$APP_DIR/node_modules" ]]; then
+    echo "Node-RED 依赖尚未安装，请先执行 sudo bash ./install.sh。" >&2
+    exit 1
+fi
+
+cd "$APP_DIR"
+exec "$NODE_BIN" "$APP_DIR/scripts/start.js"

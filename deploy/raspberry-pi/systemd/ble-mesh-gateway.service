@@ -1,0 +1,26 @@
+[Unit]
+Description=BLE Mesh Gateway Node-RED Dashboard
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=blemesh
+Group=blemesh
+SupplementaryGroups=dialout
+WorkingDirectory=/opt/ble-mesh-gateway/app
+EnvironmentFile=-/etc/ble-mesh-gateway/ble-mesh-gateway.env
+ExecStart=/opt/ble-mesh-gateway/main
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/opt/ble-mesh-gateway/app /var/lib/ble-mesh-gateway
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

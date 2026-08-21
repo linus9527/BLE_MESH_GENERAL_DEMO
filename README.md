@@ -1,4 +1,4 @@
-# BLE_MESH_DEMO
+# AquaMesh Gateway
 
 基于 nRF Connect SDK 2.9.3 的七设备 BLE Mesh 演示项目：
 
@@ -16,3 +16,6 @@
 
 - 节点：`xiao_ble/nrf52840/sense`
 - 网关：`nrf52840dongle/nrf52840`
+- 上位机：`node-red/`，提供 Windows 本地运行、树莓派容器部署、Dashboard 2.0 和 MQTT 预留接口。
+
+树莓派无图形界面的原生发行包构建、首次部署、升级、SSH/串口排障和 Dashboard 测试步骤见 `deploy/raspberry-pi/README.md`；在 Windows PowerShell 中执行 `deploy/raspberry-pi/build-release.ps1` 可生成 `output/ble-mesh-gateway-rpi-v1.0.2.tar.gz`。

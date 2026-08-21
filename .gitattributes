@@ -1,0 +1,3 @@
+/deploy/raspberry-pi/main text eol=lf
+/deploy/raspberry-pi/*.sh text eol=lf
+/deploy/raspberry-pi/systemd/*.service text eol=lf

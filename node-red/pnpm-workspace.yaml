@@ -1,0 +1,4 @@
+packages:
+  - '.'
+allowBuilds:
+  '@serialport/bindings-cpp': set this to true or false

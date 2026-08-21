@@ -1,0 +1,25 @@
+services:
+  node-red:
+    build:
+      context: .
+    container_name: ble-mesh-node-red
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    environment:
+      TZ: Asia/Shanghai
+      SERIAL_PORT: ${SERIAL_PORT:-/dev/ttyACM0}
+      MQTT_ENABLED: ${MQTT_ENABLED:-false}
+      MQTT_HOST: ${MQTT_HOST:-127.0.0.1}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-ble-mesh-gateway-pi}
+      MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-ble_mesh}
+      HISTORY_DATA_DIR: /data/data
+      HISTORY_DB: /data/data/sensor-history.sqlite
+      NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:-change-this-before-production}
+    volumes:
+      - "./data:/data/data"
+    devices:
+      - "${SERIAL_PORT:-/dev/ttyACM0}:${SERIAL_PORT:-/dev/ttyACM0}"
+    group_add:
+      - "${DIALOUT_GID:-20}"

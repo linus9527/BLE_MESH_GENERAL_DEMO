@@ -1,0 +1,1153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aquamesh:gateway-dashboard:flat:v1",
+  "title": "AquaMesh Gateway-Dashboard Flat JSON API v1",
+  "description": "One flat JSON object. Known and extension property values are scalar or null; nested objects and arrays are forbidden.",
+  "type": "object",
+  "minProperties": 2,
+  "maxProperties": 64,
+  "required": [
+    "schema_version",
+    "type"
+  ],
+  "propertyNames": {
+    "pattern": "^[a-z][a-z0-9_]*$"
+  },
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "category": {
+      "enum": [
+        "telemetry",
+        "status",
+        "alert",
+        "command",
+        "command_ack",
+        "command_result",
+        "error",
+        "diagnostic"
+      ]
+    },
+    "message_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 8,
+      "maxLength": 64
+    },
+    "request_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 8,
+      "maxLength": 64
+    },
+    "sequence": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "source": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "gateway_id": {
+      "$ref": "#/$defs/idOrNull"
+    },
+    "node_id": {
+      "$ref": "#/$defs/idOrNull"
+    },
+    "sensor_id": {
+      "$ref": "#/$defs/idOrNull"
+    },
+    "sensor_type": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 48
+    },
+    "device_id": {
+      "$ref": "#/$defs/idOrNull"
+    },
+    "device_name": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "manufacturer": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "firmware_version": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 32
+    },
+    "mesh_addr": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^0x[0-9A-Fa-f]{4}$"
+    },
+    "rs485_bus": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 15
+    },
+    "rs485_address": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 255
+    },
+    "transport": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 32
+    },
+    "sample_time_unix_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    },
+    "gateway_received_time_unix_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    },
+    "received_time_unix_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    },
+    "uptime_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    },
+    "timestamp_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    },
+    "time_quality": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "synchronized",
+        "gateway_synchronized",
+        "received",
+        "unsynchronized",
+        "unknown",
+        null
+      ]
+    },
+    "online": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "status": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "ok",
+        "warning",
+        "error",
+        "offline",
+        "unknown",
+        null
+      ]
+    },
+    "quality": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "good",
+        "uncertain",
+        "bad",
+        "stale",
+        "unknown",
+        null
+      ]
+    },
+    "data_valid": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "range_valid": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "unit_valid": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "calibration_valid": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "state_flags": {
+      "$ref": "#/$defs/uint32OrNull"
+    },
+    "state_flags_namespace": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "fault_bits": {
+      "$ref": "#/$defs/uint32OrNull"
+    },
+    "fault_bits_namespace": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "error_code": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "error_message": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "error_layer": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "sensor",
+        "modbus",
+        "mesh",
+        "gateway",
+        "transport",
+        "dashboard",
+        "storage",
+        null
+      ]
+    },
+    "retryable": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "retry_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 255
+    },
+    "modbus_function": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 255
+    },
+    "modbus_exception_code": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 255
+    },
+    "register_address": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "crc_ok": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "error": {
+      "type": [
+        "string",
+        "number",
+        "null"
+      ]
+    },
+    "reason": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "metric": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 64
+    },
+    "value": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "unit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 24
+    },
+    "raw_value": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": -2147483648,
+      "maximum": 4294967295
+    },
+    "decimal_places": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9
+    },
+    "unit_code": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "unit_code_namespace": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "min_value": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "max_value": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "temperature_c": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "humidity_pct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "ph": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 14
+    },
+    "ph_mv": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "ph_zero_mv": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "ph_slope_pct": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "ph_calibration_points": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 16
+    },
+    "ph_calibration_type": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "orp_mv": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "orp_drift_mv": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "dissolved_oxygen_mg_l": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 20
+    },
+    "saturation_pct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 200
+    },
+    "salinity_ppt": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "atmospheric_pressure_mmhg": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "temperature_mode": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "filter_coefficient": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "calibration_status_known": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "air_calibrated": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "zero_calibrated": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "conductivity_us_cm": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "conductivity_ms_cm": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "tds_mg_l": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "turbidity_ntu": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "ammonia_nitrogen_mg_l": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "residual_chlorine_mg_l": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "cod_mg_l": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "water_level_m": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "water_level_pct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "pressure_kpa": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "state": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "target_state": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "actual_state": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "direction": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "speed_pct": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "position_pct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "stop_pulse_us": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 500,
+      "maximum": 2500
+    },
+    "command": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "result": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "accepted": {
+      "$ref": "#/$defs/boolOrNull"
+    },
+    "feedback_source": {
+      "$ref": "#/$defs/shortStringOrNull"
+    },
+    "calibration_point": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "4.00",
+        "6.86",
+        "7.00",
+        "9.18",
+        "10.00",
+        "10.01",
+        null
+      ]
+    },
+    "point": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 16
+    },
+    "trigger_sensor_id": {
+      "$ref": "#/$defs/idOrNull"
+    },
+    "trigger_value": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "trigger_unit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 24
+    },
+    "lower_threshold": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "upper_threshold": {
+      "$ref": "#/$defs/numberOrNull"
+    },
+    "timeout_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    },
+    "command_timeout_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    },
+    "elapsed_ms": {
+      "$ref": "#/$defs/timeOrNull"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "ph_report",
+              "orp_report",
+              "do_report",
+              "water_level_report",
+              "dht_report",
+              "sensor_metric_report"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "node_id",
+          "sensor_id",
+          "sensor_type",
+          "quality"
+        ],
+        "properties": {
+          "category": {
+            "const": "telemetry"
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "sample_time_unix_ms"
+            ]
+          },
+          {
+            "required": [
+              "gateway_received_time_unix_ms"
+            ]
+          },
+          {
+            "required": [
+              "received_time_unix_ms"
+            ]
+          },
+          {
+            "required": [
+              "uptime_ms"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "ph_report",
+              "orp_report",
+              "do_report",
+              "water_level_report"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "mesh_addr",
+          "rs485_address"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ph_report"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "ph"
+        ],
+        "properties": {
+          "sensor_type": {
+            "const": "ph"
+          },
+          "ph": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 14
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "orp_report"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "orp_mv"
+        ],
+        "properties": {
+          "sensor_type": {
+            "const": "orp"
+          },
+          "orp_mv": {
+            "type": "number",
+            "minimum": -1000,
+            "maximum": 1000
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "do_report"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "dissolved_oxygen_mg_l",
+          "calibration_status_known",
+          "air_calibrated",
+          "zero_calibrated"
+        ],
+        "properties": {
+          "sensor_type": {
+            "const": "do"
+          },
+          "dissolved_oxygen_mg_l": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "water_level_report"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "value",
+          "unit",
+          "unit_valid"
+        ],
+        "properties": {
+          "sensor_type": {
+            "const": "water_level"
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit_valid": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "sensor_metric_report"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "metric",
+          "value",
+          "unit",
+          "unit_valid"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit_valid": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "dht_report"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "temperature_c",
+          "humidity_pct"
+        ],
+        "properties": {
+          "sensor_type": {
+            "const": "temperature_humidity"
+          },
+          "temperature_c": {
+            "type": "number"
+          },
+          "humidity_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "sensor_error",
+              "sensor_recovered"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "node_id",
+          "sensor_id",
+          "sensor_type"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "sensor_error"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "error_code",
+          "error_layer"
+        ],
+        "properties": {
+          "category": {
+            "const": "error"
+          },
+          "error_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error_layer": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "servo_command",
+              "ph_calibrate",
+              "valve_command"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "category": {
+            "const": "command"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ph_calibrate"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "sensor_id",
+          "calibration_point"
+        ],
+        "properties": {
+          "calibration_point": {
+            "type": "string",
+            "enum": [
+              "4.00",
+              "6.86",
+              "7.00",
+              "9.18",
+              "10.00",
+              "10.01"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "valve_command"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "device_id",
+          "source",
+          "target_state"
+        ],
+        "properties": {
+          "target_state": {
+            "enum": [
+              "open",
+              "closed"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "servo_command"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "device_id",
+          "direction",
+          "speed_pct"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "valve_command_accepted",
+              "ph_calibration_accepted",
+              "servo_command_accepted"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "request_id",
+          "accepted"
+        ],
+        "properties": {
+          "category": {
+            "const": "command_ack"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8
+          },
+          "accepted": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "valve_result",
+              "ph_calibration_result",
+              "servo_result"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "request_id",
+          "result"
+        ],
+        "properties": {
+          "category": {
+            "const": "command_result"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8
+          },
+          "result": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "invalid_command",
+              "api_error",
+              "mesh_send_failed"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "error_code"
+        ],
+        "properties": {
+          "category": {
+            "const": "error"
+          },
+          "error_code": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": {
+    "type": [
+      "string",
+      "number",
+      "boolean",
+      "null"
+    ]
+  },
+  "$defs": {
+    "idOrNull": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    },
+    "timeOrNull": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "uint32OrNull": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "boolOrNull": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "numberOrNull": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "shortStringOrNull": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    }
+  }
+}

@@ -20,6 +20,7 @@
 #include "app_mesh.h"
 #include "app_protocol.h"
 
+#define GATEWAY_JSON_LINE_MAX 384
 #define SERIAL_LINE_MAX 192
 #define SERIAL_RX_QUEUE_SIZE 256
 #define SERIAL_CONNECTION_POLL_MS 100
@@ -70,7 +71,7 @@ static int64_t timestamp_ms(void)
 
 static void emit_json(const char *format, ...)
 {
-	char line[256];
+	char line[GATEWAY_JSON_LINE_MAX];
 	va_list arguments;
 	int length;
 

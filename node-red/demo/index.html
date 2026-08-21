@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AquaMesh · 水质与液位智能控制平台</title>
+  <style>
+    :root {
+      --ink: #102a43;
+      --muted: #687d8f;
+      --line: #dce7eb;
+      --page: #eff5f6;
+      --surface: #ffffff;
+      --primary: #087e75;
+      --primary-dark: #075d58;
+      --primary-soft: #e1f4f1;
+      --blue: #2576d3;
+      --blue-soft: #e8f2fe;
+      --amber: #c37809;
+      --amber-soft: #fff4dc;
+      --danger: #c64040;
+      --danger-soft: #fff0ef;
+      --shadow: 0 12px 34px rgba(24, 65, 78, .08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--page); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(8,126,117,.08), transparent 28rem),
+        var(--page);
+      font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+    }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, select:focus-visible, input:focus-visible {
+      outline: 3px solid rgba(37, 118, 211, .28);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      min-height: 72px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      color: #fff;
+      background: linear-gradient(110deg, #092e3a, #0a4d55 58%, #087e75);
+      box-shadow: 0 8px 30px rgba(9, 46, 58, .18);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 260px; }
+    .brand-mark {
+      width: 38px; height: 38px; display: grid; place-items: center;
+      border-radius: 12px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.18);
+    }
+    .brand-mark svg { width: 23px; height: 23px; }
+    .brand-name { font-size: 18px; font-weight: 650; letter-spacing: .3px; }
+    .brand-sub { margin-top: 2px; color: rgba(255,255,255,.68); font-size: 12px; }
+    .nav { display: flex; gap: 6px; }
+    .nav button {
+      padding: 9px 14px; border: 0; border-radius: 10px; color: rgba(255,255,255,.72); background: transparent;
+    }
+    .nav button.active { color: #fff; background: rgba(255,255,255,.13); }
+    .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; min-width: 365px; }
+    .top-pill {
+      min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px;
+      border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: rgba(0,0,0,.12); color: #fff;
+    }
+    .top-pill .muted-light { color: rgba(255,255,255,.65); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #8fa1ab; flex: 0 0 auto; }
+    .dot.live { background: #6ee7b7; box-shadow: 0 0 0 5px rgba(110,231,183,.12); }
+    .dot.warn { background: #ffd166; }
+    .dot.error { background: #ff8d86; }
+    .demo-button {
+      min-height: 34px; padding: 0 12px; color: #fff; border: 1px solid rgba(255,255,255,.2);
+      border-radius: 10px; background: rgba(255,255,255,.1);
+    }
+    .demo-button:hover { background: rgba(255,255,255,.17); }
+
+    .shell { max-width: 1920px; margin: 0 auto; padding: 18px 24px 28px; }
+    .connection-bar {
+      min-height: 58px; display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.94); box-shadow: var(--shadow);
+    }
+    .connection-title { display: flex; align-items: center; gap: 9px; min-width: 150px; font-weight: 650; }
+    .connection-title svg { color: var(--primary); }
+    .select-wrap { position: relative; flex: 1; max-width: 560px; }
+    select {
+      width: 100%; height: 38px; padding: 0 36px 0 11px; color: var(--ink); background: #f8fbfc;
+      border: 1px solid var(--line); border-radius: 10px;
+    }
+    .button {
+      min-height: 38px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; font-weight: 600;
+    }
+    .button:hover { border-color: #b9cbd1; background: #f8fbfc; }
+    .button.primary { color: #fff; border-color: var(--primary); background: var(--primary); }
+    .button.primary:hover { background: var(--primary-dark); }
+    .button.danger { color: var(--danger); border-color: #efc4c1; background: #fff7f6; }
+    .button.compact { min-height: 30px; padding: 0 10px; font-size: 12px; }
+    .button:disabled { opacity: .48; cursor: not-allowed; }
+    .connection-state {
+      margin-left: auto; min-width: 235px; display: flex; justify-content: flex-end; align-items: center; gap: 9px; color: var(--muted);
+    }
+    .connection-state strong { color: var(--ink); font-weight: 650; }
+
+    .summary-row { margin: 14px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .page-title h1 { margin: 0; font-size: 22px; font-weight: 680; letter-spacing: -.2px; }
+    .page-title p { margin: 4px 0 0; color: var(--muted); }
+    .summary-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .summary-chip {
+      min-height: 36px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px;
+      color: var(--muted); background: rgba(255,255,255,.76); border: 1px solid var(--line); border-radius: 12px;
+    }
+    .summary-chip strong { color: var(--ink); font-size: 15px; }
+
+    .sensor-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+    .card {
+      border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow);
+    }
+    .sensor-card { min-width: 0; padding: 16px; overflow: hidden; }
+    .sensor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .sensor-name { display: flex; align-items: center; gap: 10px; }
+    .sensor-icon {
+      width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px;
+      color: var(--primary); background: var(--primary-soft);
+    }
+    .sensor-icon.blue { color: var(--blue); background: var(--blue-soft); }
+    .sensor-icon.amber { color: var(--amber); background: var(--amber-soft); }
+    .sensor-title { font-size: 15px; font-weight: 680; }
+    .sensor-meta { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .status-label { display: inline-flex; align-items: center; gap: 7px; color: #167269; font-size: 12px; font-weight: 650; }
+    .reading-row { min-height: 68px; margin-top: 13px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .reading { font-size: 38px; font-weight: 720; line-height: 1; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; }
+    .unit { margin-left: 5px; color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 0; }
+    .reading-caption { margin-top: 7px; color: var(--muted); font-size: 12px; }
+    .mini-stat { text-align: right; }
+    .mini-stat strong { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .mini-stat span { color: var(--muted); font-size: 11px; }
+    .chart-wrap { position: relative; height: 88px; margin: 8px -2px 0; }
+    .chart-wrap svg { width: 100%; height: 100%; overflow: visible; }
+    .grid-line { stroke: #e7eef1; stroke-width: 1; }
+    .chart-fill { opacity: .14; }
+    .chart-line { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+    .chart-dot { stroke: #fff; stroke-width: 3; }
+    .chart-label { fill: var(--muted); font-size: 9px; }
+    .card-foot { margin-top: 6px; padding-top: 9px; border-top: 1px solid #edf2f4; display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; }
+    .source-tag { color: var(--primary-dark); font-weight: 600; }
+
+    .lower-grid { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(360px, .9fr); gap: 14px; }
+    .panel { padding: 17px 18px; }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .panel-title { font-size: 16px; font-weight: 680; }
+    .panel-sub { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .mode-switch { display: inline-flex; padding: 3px; border-radius: 11px; background: #edf3f5; }
+    .mode-switch button { min-width: 72px; height: 32px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-weight: 650; }
+    .mode-switch button.active { color: #fff; background: var(--primary); box-shadow: 0 3px 10px rgba(8,126,117,.2); }
+    .valve-body { margin-top: 16px; display: grid; grid-template-columns: minmax(210px,.8fr) minmax(320px,1.35fr) minmax(180px,.7fr); gap: 16px; align-items: stretch; }
+    .valve-state {
+      padding: 14px; border-radius: 14px; background: linear-gradient(145deg, #f0faf8, #f7fbfb); border: 1px solid #d6eeea;
+    }
+    .valve-visual { display: flex; align-items: center; gap: 13px; }
+    .valve-disc {
+      width: 58px; height: 58px; display: grid; place-items: center; color: var(--primary); border-radius: 50%;
+      background: #fff; border: 6px solid #cae9e5; box-shadow: inset 0 0 0 1px #a9d8d2;
+    }
+    .valve-state.open .valve-disc { color: var(--blue); border-color: #c8dffd; }
+    .valve-main { font-size: 19px; font-weight: 720; }
+    .valve-note { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .command-progress { margin-top: 13px; color: var(--muted); font-size: 12px; }
+    .rule-card { padding: 13px 14px; border: 1px solid var(--line); border-radius: 14px; }
+    .rule-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .rule-head-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .rule-title { font-weight: 650; }
+    .rule-live { color: var(--primary); font-size: 12px; }
+    .rule-scale { position: relative; height: 9px; margin: 28px 3px 22px; border-radius: 9px; background: linear-gradient(90deg,#dbeeff 0 38%,#e1f4f1 38% 75%,#fde8d3 75%); }
+    .threshold { position: absolute; top: -7px; width: 2px; height: 23px; background: #6a8290; }
+    .threshold > span { position: absolute; top: 26px; left: 0; transform: translateX(-45%); white-space: nowrap; color: var(--muted); font-size: 10px; }
+    .threshold.low { left: 38%; }
+    .threshold.high { left: 75%; }
+    .level-marker { position: absolute; top: -6px; left: 54%; width: 20px; height: 20px; transform: translateX(-50%); border: 4px solid #fff; border-radius: 50%; background: var(--primary); box-shadow: 0 2px 8px rgba(8,126,117,.3); transition: left .35s ease; }
+    .rule-result { margin-top: 9px; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+    .manual-control { padding: 13px 14px; border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .switch {
+      width: 52px; height: 29px; padding: 3px; display: flex; justify-content: flex-start; border: 0; border-radius: 18px; background: #cbd7dc;
+      transition: background .2s ease;
+    }
+    .switch::after { content: ""; width: 23px; height: 23px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(16,42,67,.2); transition: transform .22s ease; }
+    .switch.on { background: var(--primary); }
+    .switch.on::after { transform: translateX(23px); }
+    .switch:disabled { opacity: .45; cursor: not-allowed; }
+    .manual-help { margin-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+    .events { max-height: 272px; overflow: auto; }
+    .event-list { margin-top: 10px; display: grid; gap: 2px; }
+    .event { padding: 9px 2px; display: grid; grid-template-columns: 58px 1fr auto; gap: 9px; align-items: center; border-bottom: 1px solid #edf2f4; }
+    .event:last-child { border-bottom: 0; }
+    .event-time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11px; }
+    .event-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .event-badge { padding: 3px 7px; border-radius: 7px; color: #14736b; background: var(--primary-soft); font-size: 10px; }
+    .event-badge.warn { color: #9b5c00; background: var(--amber-soft); }
+
+    .drawer-backdrop, .modal-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(6,31,41,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+    .drawer-backdrop.show, .modal-backdrop.show { opacity: 1; pointer-events: auto; }
+    .demo-drawer {
+      position: fixed; z-index: 31; top: 0; right: 0; width: min(420px, 94vw); height: 100%; padding: 22px;
+      background: #fff; box-shadow: -18px 0 45px rgba(9,46,58,.2); transform: translateX(103%); transition: transform .25s ease;
+    }
+    .demo-drawer.show { transform: translateX(0); }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+    .drawer-head h2 { margin: 0; font-size: 19px; }
+    .icon-button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .demo-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .demo-section h3 { margin: 0 0 13px; font-size: 14px; }
+    .field-label { margin-bottom: 7px; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    input[type="range"] { width: 100%; accent-color: var(--primary); }
+    .demo-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .demo-hint { margin-top: 14px; padding: 11px; color: var(--muted); background: #f3f7f8; border-radius: 10px; font-size: 11px; line-height: 1.55; }
+
+    .modal-backdrop { display: grid; place-items: center; padding: 18px; z-index: 40; }
+    .modal {
+      width: min(430px, 100%); padding: 22px; border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(5,30,40,.3);
+      transform: translateY(8px) scale(.98); transition: transform .2s ease;
+    }
+    .modal-backdrop.show .modal { transform: none; }
+    .modal-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: var(--amber); background: var(--amber-soft); }
+    .modal h2 { margin: 15px 0 7px; font-size: 19px; }
+    .modal p { margin: 0; color: var(--muted); line-height: 1.65; }
+    .modal-actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 9px; }
+    .mapping-modal { width: min(1040px, 100%); max-height: min(82vh, 820px); display: flex; flex-direction: column; }
+    .mapping-modal h2 { margin-top: 0; }
+    .mapping-intro { margin-bottom: 14px !important; }
+    .mapping-scroll { min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+    .mapping-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .mapping-table th, .mapping-table td { padding: 11px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #e9f0f2; line-height: 1.55; }
+    .mapping-table th { position: sticky; top: 0; z-index: 1; color: #476274; background: #f2f7f8; font-weight: 650; }
+    .mapping-table tr:last-child td { border-bottom: 0; }
+    .mapping-table code { color: #075d58; font-family: Consolas, "SFMono-Regular", monospace; font-size: 11px; }
+    .mapping-label { min-width: 105px; font-weight: 650; color: var(--ink); }
+    .threshold-modal { width: min(520px, 100%); }
+    .threshold-fields { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .threshold-field label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; }
+    .threshold-input-wrap { height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: #f8fbfc; }
+    .threshold-input-wrap:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,118,211,.12); }
+    .threshold-input-wrap input { min-width: 0; width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-variant-numeric: tabular-nums; }
+    .threshold-input-wrap span { white-space: nowrap; color: var(--muted); font-size: 12px; }
+    .threshold-error { min-height: 20px; margin-top: 10px; color: var(--danger); font-size: 12px; }
+    .threshold-note { margin-top: 10px !important; padding: 10px 11px; border-radius: 10px; background: var(--amber-soft); font-size: 12px; }
+
+    .toast {
+      position: fixed; z-index: 50; left: 50%; bottom: 26px; max-width: min(540px, calc(100% - 30px));
+      padding: 11px 15px; color: #fff; background: #113f4a; border-radius: 11px; box-shadow: 0 12px 34px rgba(5,30,40,.28);
+      transform: translate(-50%, 24px); opacity: 0; pointer-events: none; transition: .22s ease;
+    }
+    .toast.show { transform: translate(-50%,0); opacity: 1; }
+
+    @media (max-width: 1500px) {
+      .sensor-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .valve-body { grid-template-columns: 1fr 1.3fr; }
+      .manual-control { grid-column: 1 / -1; }
+      .lower-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 980px) {
+      .topbar { padding: 12px 16px; flex-wrap: wrap; }
+      .nav { order: 3; width: 100%; }
+      .top-actions { min-width: 0; }
+      .connection-bar { align-items: stretch; flex-wrap: wrap; }
+      .select-wrap { min-width: 100%; max-width: none; order: 2; }
+      .connection-state { margin-left: 0; min-width: 0; flex: 1; }
+    }
+    @media (max-width: 720px) {
+      .shell { padding: 14px 12px 22px; }
+      .brand { min-width: 0; }
+      .brand-sub, .nav, .top-pill.nodes, .top-pill.devices { display: none; }
+      .top-actions { margin-left: auto; }
+      .sensor-grid { grid-template-columns: 1fr; }
+      .summary-row { align-items: flex-start; flex-direction: column; }
+      .summary-chips { justify-content: flex-start; }
+      .valve-body { grid-template-columns: 1fr; }
+      .manual-control { grid-column: auto; }
+      .event { grid-template-columns: 52px 1fr; }
+      .event-badge { display: none; }
+      .reading { font-size: 34px; }
+      .threshold-fields { grid-template-columns: 1fr; }
+      .mapping-table { min-width: 720px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2.8C9.4 7 5.6 10.6 5.6 15A6.4 6.4 0 0 0 18.4 15C18.4 10.6 14.6 7 12 2.8Z" stroke="currentColor" stroke-width="1.8"/><path d="M9 16.2c.8 1.4 2.2 2 3.8 1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div><div class="brand-name">AquaMesh</div><div class="brand-sub">水质与液位智能控制平台</div></div>
+    </div>
+    <nav class="nav" aria-label="主导航">
+      <button type="button" class="active">设备总览</button>
+      <button type="button" id="navEvents">事件记录</button>
+      <button type="button" id="navDiagnostics">连接与诊断</button>
+    </nav>
+    <div class="top-actions">
+      <div class="top-pill nodes"><span class="dot live"></span><span class="muted-light">节点</span><strong>3 / 3</strong></div>
+      <div class="top-pill devices"><span class="muted-light">设备</span><strong>5 / 5</strong></div>
+      <button type="button" class="demo-button" id="openMapping">数据映射</button>
+      <button type="button" class="demo-button" id="openDemo">演示控制</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="connection-bar" id="connectionPanel" aria-label="网关串口连接">
+      <div class="connection-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7v4a5 5 0 0 0 10 0V7M5 3h4v4H5V3Zm10 0h4v4h-4V3ZM12 16v5m-3 0h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        USB 网关
+      </div>
+      <div class="select-wrap">
+        <select id="serialSelect" aria-label="选择网关串口">
+          <option value="COM24">COM24 · nRF52840 Dongle · Nordic Semiconductor</option>
+        </select>
+      </div>
+      <button type="button" class="button" id="refreshSerial">刷新串口</button>
+      <button type="button" class="button primary" id="connectSerial">重新连接</button>
+      <button type="button" class="button danger" id="disconnectSerial">断开</button>
+      <div class="connection-state"><span class="dot live" id="gatewayDot"></span><div><strong id="gatewayState">网关在线</strong><div id="gatewayDetail">COM24 · 115200 8N1</div></div></div>
+    </section>
+
+    <div class="summary-row">
+      <div class="page-title"><h1>设备总览</h1><p>四类水质与液位数据 · 最近更新 <span id="lastUpdated">刚刚</span></p></div>
+      <div class="summary-chips">
+        <div class="summary-chip"><span class="dot live"></span><span>传感器</span><strong>4 / 4 在线</strong></div>
+        <div class="summary-chip"><span>活动异常</span><strong>0</strong></div>
+        <div class="summary-chip"><span>数据周期</span><strong>2 s</strong></div>
+      </div>
+    </div>
+
+    <section class="sensor-grid" aria-label="传感器实时数据">
+      <article class="card sensor-card">
+        <div class="sensor-head"><div class="sensor-name"><div class="sensor-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M7 5h10M9 3v4m6-4v4M6 9h12v10H6V9Zm3 4h6m-6 3h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div><div><div class="sensor-title">pH 传感器</div><div class="sensor-meta">节点 01 · RS485 地址 1</div></div></div><div class="status-label"><span class="dot live"></span>数据正常</div></div>
+        <div class="reading-row"><div><div class="reading">7.24<span class="unit">pH</span></div><div class="reading-caption">主变量 · 实时读数</div></div><div class="mini-stat"><strong>24.8 °C</strong><span>水温 · 6.2 mV</span></div></div>
+        <div class="chart-wrap"><svg viewBox="0 0 300 88" preserveAspectRatio="none" aria-label="pH 最近15分钟趋势"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#087e75"/><stop offset="1" stop-color="#087e75" stop-opacity="0"/></linearGradient></defs><line class="grid-line" x1="0" y1="68" x2="300" y2="68"/><path class="chart-fill" fill="url(#g1)" d="M0,57 L22,52 L44,54 L66,45 L88,48 L110,41 L132,44 L154,36 L176,39 L198,34 L220,37 L242,31 L264,33 L286,27 L300,29 L300,78 L0,78Z"/><path class="chart-line" stroke="#087e75" d="M0,57 L22,52 L44,54 L66,45 L88,48 L110,41 L132,44 L154,36 L176,39 L198,34 L220,37 L242,31 L264,33 L286,27 L300,29"/><circle class="chart-dot" cx="300" cy="29" r="4" fill="#087e75"/><text class="chart-label" x="0" y="85">15 分钟前</text><text class="chart-label" x="267" y="85">现在</text></svg></div>
+        <div class="card-foot"><span>字段 ph_report.ph</span><span>更新于 2 秒前</span></div>
+      </article>
+
+      <article class="card sensor-card">
+        <div class="sensor-head"><div class="sensor-name"><div class="sensor-icon blue"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M6.8 6.2c2 1.5 3.2 3.4 3.2 5.8s-1.2 4.3-3.2 5.8M17.2 6.2c-2 1.5-3.2 3.4-3.2 5.8s1.2 4.3 3.2 5.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div><div><div class="sensor-title">ORP 传感器</div><div class="sensor-meta">节点 01 · RS485 地址 2</div></div></div><div class="status-label"><span class="dot live"></span>数据正常</div></div>
+        <div class="reading-row"><div><div class="reading">236.4<span class="unit">mV</span></div><div class="reading-caption">氧化还原电位</div></div><div class="mini-stat"><strong>24.7 °C</strong><span>漂移 +1.2 mV</span></div></div>
+        <div class="chart-wrap"><svg viewBox="0 0 300 88" preserveAspectRatio="none" aria-label="ORP 最近15分钟趋势"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2576d3"/><stop offset="1" stop-color="#2576d3" stop-opacity="0"/></linearGradient></defs><line class="grid-line" x1="0" y1="68" x2="300" y2="68"/><path class="chart-fill" fill="url(#g2)" d="M0,46 L22,41 L44,49 L66,42 L88,44 L110,35 L132,38 L154,34 L176,37 L198,30 L220,33 L242,29 L264,31 L286,25 L300,27 L300,78 L0,78Z"/><path class="chart-line" stroke="#2576d3" d="M0,46 L22,41 L44,49 L66,42 L88,44 L110,35 L132,38 L154,34 L176,37 L198,30 L220,33 L242,29 L264,31 L286,25 L300,27"/><circle class="chart-dot" cx="300" cy="27" r="4" fill="#2576d3"/><text class="chart-label" x="0" y="85">15 分钟前</text><text class="chart-label" x="267" y="85">现在</text></svg></div>
+        <div class="card-foot"><span>字段 orp_report.orp_mv</span><span>更新于 1 秒前</span></div>
+      </article>
+
+      <article class="card sensor-card">
+        <div class="sensor-head"><div class="sensor-name"><div class="sensor-icon blue"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/><path d="M8 14.5c1.2-1.5 2.5-2.2 4-2.2s2.8.7 4 2.2M9.5 8.5h.01m5 0h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><div class="sensor-title">溶解氧传感器</div><div class="sensor-meta">节点 02 · RS485 地址 1</div></div></div><div class="status-label"><span class="dot live"></span>数据正常</div></div>
+        <div class="reading-row"><div><div class="reading">8.35<span class="unit">mg/L</span></div><div class="reading-caption">溶解氧浓度</div></div><div class="mini-stat"><strong>96 %</strong><span>饱和度 · 25.0 °C</span></div></div>
+        <div class="chart-wrap"><svg viewBox="0 0 300 88" preserveAspectRatio="none" aria-label="溶解氧最近15分钟趋势"><defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2576d3"/><stop offset="1" stop-color="#2576d3" stop-opacity="0"/></linearGradient></defs><line class="grid-line" x1="0" y1="68" x2="300" y2="68"/><path class="chart-fill" fill="url(#g3)" d="M0,52 L22,48 L44,50 L66,43 L88,47 L110,40 L132,42 L154,39 L176,40 L198,36 L220,38 L242,34 L264,36 L286,32 L300,33 L300,78 L0,78Z"/><path class="chart-line" stroke="#2576d3" d="M0,52 L22,48 L44,50 L66,43 L88,47 L110,40 L132,42 L154,39 L176,40 L198,36 L220,38 L242,34 L264,36 L286,32 L300,33"/><circle class="chart-dot" cx="300" cy="33" r="4" fill="#2576d3"/><text class="chart-label" x="0" y="85">15 分钟前</text><text class="chart-label" x="267" y="85">现在</text></svg></div>
+        <div class="card-foot"><span>air_calibrated = true</span><span>更新于 2 秒前</span></div>
+      </article>
+
+      <article class="card sensor-card" id="waterCard">
+        <div class="sensor-head"><div class="sensor-name"><div class="sensor-icon amber"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M4 16.5c2-1.5 3.8-1.5 5.8 0 2 1.5 3.8 1.5 5.8 0 1.5-1.1 2.8-1.4 4.4-.6M4 11.5c2-1.5 3.8-1.5 5.8 0 2 1.5 3.8 1.5 5.8 0 1.5-1.1 2.8-1.4 4.4-.6M12 3v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div><div><div class="sensor-title">水位压力传感器</div><div class="sensor-meta">节点 02 · RS485 地址 4</div></div></div><div class="status-label"><span class="dot live"></span>数据正常</div></div>
+        <div class="reading-row"><div><div class="reading"><span id="levelValue">0.86</span><span class="unit" id="levelUnit">mH₂O</span></div><div class="reading-caption" id="waterUnitCaption">水柱压力 · payload.unit</div></div><div class="mini-stat"><strong id="levelBand">保持区间</strong><span>阈值状态</span></div></div>
+        <div class="chart-wrap"><svg viewBox="0 0 300 88" preserveAspectRatio="none" aria-label="水位最近15分钟趋势"><defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c37809"/><stop offset="1" stop-color="#c37809" stop-opacity="0"/></linearGradient></defs><line class="grid-line" x1="0" y1="68" x2="300" y2="68"/><path id="waterFill" class="chart-fill" fill="url(#g4)" d="M0,58 L30,57 L60,54 L90,52 L120,48 L150,45 L180,43 L210,39 L240,37 L270,34 L300,31 L300,78 L0,78Z"/><path id="waterLine" class="chart-line" stroke="#c37809" d="M0,58 L30,57 L60,54 L90,52 L120,48 L150,45 L180,43 L210,39 L240,37 L270,34 L300,31"/><circle id="waterDot" class="chart-dot" cx="300" cy="31" r="4" fill="#c37809"/><text class="chart-label" x="0" y="85">15 分钟前</text><text class="chart-label" x="267" y="85">现在</text></svg></div>
+        <div class="card-foot"><span class="source-tag" id="unitSource">单位来自网关数据包</span><span>更新于刚刚</span></div>
+      </article>
+    </section>
+
+    <section class="lower-grid">
+      <article class="card panel" id="valvePanel">
+        <div class="panel-head"><div><div class="panel-title">进水阀控制</div><div class="panel-sub">节点 03 · 继电器开关 · 手动优先于自动</div></div><div class="mode-switch" role="group" aria-label="水阀控制模式"><button type="button" id="autoMode" class="active" aria-pressed="true">自动</button><button type="button" id="manualMode" aria-pressed="false">手动</button></div></div>
+        <div class="valve-body">
+          <div class="valve-state" id="valveStateCard">
+            <div class="valve-visual"><div class="valve-disc" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M5 12h14M12 5v14M3 5h6m6 0h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><div class="valve-main" id="valveMain">最后指令：关闭</div><div class="valve-note">继电器命令确认 · 无位置反馈</div></div></div>
+            <div class="command-progress" id="commandProgress">自动规则运行中，当前液位处于保持区间</div>
+          </div>
+          <div class="rule-card">
+            <div class="rule-head"><span class="rule-title">液位自动控制</span><span class="rule-head-actions"><span class="rule-live" id="ruleLive">自动模式已启用</span><button type="button" class="button compact" id="thresholdSettings">阈值设置</button></span></div>
+            <div class="rule-scale" id="ruleScale"><span class="threshold low" id="lowMark"><span id="lowLabel">开 0.60</span></span><span class="threshold high" id="highMark"><span id="highLabel">关 1.20</span></span><span class="level-marker" id="levelMarker"></span></div>
+            <div class="rule-result"><span>低于下限自动开阀，高于上限自动关阀</span><strong id="ruleDecision">保持关闭</strong></div>
+          </div>
+          <div class="manual-control">
+            <div class="toggle-row"><div><div class="rule-title">直接控制</div><div class="panel-sub">切换到手动后可用</div></div><button type="button" class="switch" id="valveToggle" aria-label="打开或关闭进水阀" aria-pressed="false" disabled></button></div>
+            <div class="manual-help" id="manualHelp">当前由液位规则控制。需要人工操作时请先切换为手动模式。</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card panel events" id="eventsPanel">
+        <div class="panel-head"><div><div class="panel-title">最近事件</div><div class="panel-sub">控制、连接和设备状态</div></div><button type="button" class="button" id="clearEvents">清空演示事件</button></div>
+        <div class="event-list" id="eventList">
+          <div class="event"><span class="event-time">14:02:18</span><span class="event-text">四个传感器数据接收正常</span><span class="event-badge">设备</span></div>
+          <div class="event"><span class="event-time">14:02:12</span><span class="event-text">自动规则保持进水阀关闭</span><span class="event-badge">自动</span></div>
+          <div class="event"><span class="event-time">14:02:08</span><span class="event-text">已连接上次使用的网关 COM24</span><span class="event-badge">连接</span></div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="demo-drawer" id="demoDrawer" aria-label="演示控制面板">
+    <div class="drawer-head"><div><h2>演示控制</h2><div class="panel-sub">调整模拟数据，展示自动控制逻辑</div></div><button type="button" class="icon-button" id="closeDemo" aria-label="关闭演示控制">×</button></div>
+    <section class="demo-section"><h3>模拟水位</h3><div class="field-label"><span>当前压力</span><strong><span id="rangeValue">0.86</span> mH₂O</strong></div><input type="range" id="levelRange" min="0.30" max="1.50" step="0.01" value="0.86"><div class="demo-actions" style="margin-top:10px"><button type="button" class="button" id="levelLow">低液位 0.45</button><button type="button" class="button" id="levelNormal">正常 0.86</button><button type="button" class="button" id="levelHigh">高液位 1.30</button></div><div class="demo-hint" id="thresholdHint">拖到 0.60 以下，自动模式将打开进水阀；拖到 1.20 以上，自动关闭。</div></section>
+    <section class="demo-section"><h3>单位来源</h3><select id="unitMode"><option value="payload">数据包 unit: mH2O</option><option value="code">数据包 unit_code: 7</option><option value="fallback">数据包无单位，Node-RED 默认</option><option value="unknown">未知单位（暂停自动控制）</option></select></section>
+    <section class="demo-section"><h3>系统场景</h3><div class="demo-actions"><button type="button" class="button" id="simulateOffline">水位离线</button><button type="button" class="button" id="simulateGateway">网关断开</button><button type="button" class="button" id="restoreAll">恢复全部正常</button></div></section>
+    <div class="demo-hint">这是资方展示用模拟面板，正式 Dashboard 仅在 <code>DEMO_MODE=true</code> 时显示。</div>
+  </aside>
+
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal"><div class="modal-icon" aria-hidden="true">!</div><h2 id="modalTitle">确认操作</h2><p id="modalText"></p><div class="modal-actions"><button type="button" class="button" id="modalCancel">取消</button><button type="button" class="button primary" id="modalConfirm">确认</button></div></div>
+  </div>
+  <div class="modal-backdrop" id="thresholdBackdrop" role="dialog" aria-modal="true" aria-labelledby="thresholdTitle">
+    <div class="modal threshold-modal">
+      <h2 id="thresholdTitle">设置自动液位阈值</h2>
+      <p>进水阀在低于下限时打开、高于上限时关闭，中间区域保持最后确认指令。</p>
+      <div class="threshold-fields">
+        <div class="threshold-field"><label for="lowerInput">下限 · 自动开阀</label><div class="threshold-input-wrap"><input type="number" id="lowerInput" min="0.30" max="1.50" step="0.01" inputmode="decimal"><span>mH₂O</span></div></div>
+        <div class="threshold-field"><label for="upperInput">上限 · 自动关阀</label><div class="threshold-input-wrap"><input type="number" id="upperInput" min="0.30" max="1.50" step="0.01" inputmode="decimal"><span>mH₂O</span></div></div>
+      </div>
+      <div class="threshold-error" id="thresholdError" role="alert"></div>
+      <p class="threshold-note" id="thresholdNote">当前为自动模式，保存后将用当前水位立即重新判断，阀门指令可能改变。</p>
+      <div class="modal-actions"><button type="button" class="button" id="thresholdCancel">取消</button><button type="button" class="button primary" id="thresholdSave">保存并立即应用</button></div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="mappingBackdrop" role="dialog" aria-modal="true" aria-labelledby="mappingTitle">
+    <div class="modal mapping-modal">
+      <h2 id="mappingTitle">页面与 Mesh JSON 数据映射</h2>
+      <p class="mapping-intro">串口单行 JSON 解析后位于 <code>msg.payload</code>。下表说明 Demo 页面上每个主要标签来自哪个字段，以及页面执行了什么格式化或计算。</p>
+      <div class="mapping-scroll">
+        <table class="mapping-table">
+          <thead><tr><th>页面标签</th><th>消息/状态来源</th><th>JSON 字段</th><th>展示与计算</th></tr></thead>
+          <tbody>
+            <tr><td class="mapping-label">pH 主读数</td><td><code>type=ph_report</code></td><td><code>ph</code></td><td>保留 2 位，单位固定为 pH；温度和电压分别来自 <code>temperature_c</code>、<code>ph_mv</code>。</td></tr>
+            <tr><td class="mapping-label">ORP 主读数</td><td><code>type=orp_report</code></td><td><code>orp_mv</code></td><td>保留 1 位并显示 mV；漂移来自 <code>orp_drift_mv</code>，保留正负号。</td></tr>
+            <tr><td class="mapping-label">溶解氧主读数</td><td><code>type=do_report</code></td><td><code>dissolved_oxygen_mg_l</code></td><td>保留 2 位 mg/L；饱和度来自 <code>saturation_pct</code>；只有 <code>air_calibrated=true</code> 才显示空气校准完成。</td></tr>
+            <tr><td class="mapping-label">水位压力</td><td><code>type=water_level_report</code></td><td><code>value</code></td><td>网关已换算的工程值，Node-RED 不重复除以倍率；<code>raw_value / 10^decimal_places</code> 仅用于诊断核对。</td></tr>
+            <tr><td class="mapping-label">水位单位</td><td>水位报告 + 设备注册表</td><td><code>unit</code> → <code>unit_code</code> → <code>defaultUnit</code></td><td>按此优先级解析；代码 7 映射 mH₂O。未知或不兼容单位时暂停自动控制。</td></tr>
+            <tr><td class="mapping-label">阈值状态</td><td>canonical 水位 + 阈值配置</td><td><code>value</code>、<code>lowerThreshold</code>、<code>upperThreshold</code></td><td>≤下限为低液位，≥上限为高液位，中间为保持区间；不把压力值猜算成水箱百分比。</td></tr>
+            <tr><td class="mapping-label">15 分钟趋势</td><td>每个传感器历史序列</td><td>各卡主字段 + <code>timestamp_ms</code></td><td>pH=<code>ph</code>，ORP=<code>orp_mv</code>，DO=<code>dissolved_oxygen_mg_l</code>，水位=<code>canonical_value</code>。</td></tr>
+            <tr><td class="mapping-label">数据正常/过期</td><td>设备状态模型</td><td>最后有效数据 + 接收时间 + 故障消息</td><td>有效且 60 秒内为正常；字段缺失、过期、故障、离线按优先级覆盖。异常时保留最后有效值并标明非实时。</td></tr>
+            <tr><td class="mapping-label">自动/手动</td><td>Node-RED 持久化配置</td><td><code>valveControl.mode</code></td><td>手动优先；自动模式使用上下限滞回，保存新阈值后立即重新判断。</td></tr>
+            <tr><td class="mapping-label">最后指令</td><td><code>valve_result</code></td><td><code>request_id</code>、<code>result</code>、<code>reported_state</code></td><td>“网关接受”和“节点执行”分两阶段。无位置反馈时只表达最后确认命令，不声称实际阀位。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-actions"><button type="button" class="button primary" id="mappingClose">知道了</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const state = { mode: 'auto', valve: 'closed', level: .86, low: .60, high: 1.20, unitMode: 'payload', gateway: true, waterOnline: true, pending: false };
+      const sensorMin = .30, sensorMax = 1.50, minimumGap = .05;
+      const $ = (id) => document.getElementById(id);
+      let modalResolver = null, toastTimer = null, autoTimer = null;
+
+      function timeText() { return new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+      function addEvent(text, badge = '系统', warning = false) {
+        const row = document.createElement('div'); row.className = 'event';
+        row.innerHTML = `<span class="event-time">${timeText()}</span><span class="event-text"></span><span class="event-badge${warning ? ' warn' : ''}"></span>`;
+        row.children[1].textContent = text; row.children[2].textContent = badge;
+        $('eventList').prepend(row);
+        while ($('eventList').children.length > 6) $('eventList').lastElementChild.remove();
+      }
+      function toast(text) {
+        $('toast').textContent = text; $('toast').classList.add('show'); clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2600);
+      }
+      function confirmAction(title, text, confirmText = '确认') {
+        $('modalTitle').textContent = title; $('modalText').textContent = text; $('modalConfirm').textContent = confirmText;
+        $('modalBackdrop').classList.add('show');
+        return new Promise(resolve => { modalResolver = resolve; setTimeout(() => $('modalCancel').focus(), 30); });
+      }
+      function closeModal(result) {
+        $('modalBackdrop').classList.remove('show'); if (modalResolver) modalResolver(result); modalResolver = null;
+      }
+      function openThresholdSettings() {
+        $('lowerInput').value = state.low.toFixed(2); $('upperInput').value = state.high.toFixed(2); $('thresholdError').textContent = '';
+        const isAuto = state.mode === 'auto';
+        $('thresholdNote').textContent = isAuto ? '当前为自动模式，保存后将用当前水位立即重新判断，阀门指令可能改变。' : '当前为手动模式。阈值会保存，但在重新启用自动模式前不会控制阀门。';
+        $('thresholdSave').textContent = isAuto ? '保存并立即应用' : '保存设置';
+        $('thresholdBackdrop').classList.add('show'); setTimeout(() => $('lowerInput').focus(), 30);
+      }
+      function closeThresholdSettings() { $('thresholdBackdrop').classList.remove('show'); }
+      function saveThresholds() {
+        const lowerText = $('lowerInput').value.trim(), upperText = $('upperInput').value.trim();
+        const lower = Number(lowerText), upper = Number(upperText);
+        let error = '';
+        if (!lowerText || !upperText || !Number.isFinite(lower) || !Number.isFinite(upper)) error = '请填写有效的上下限数字。';
+        else if (lower < sensorMin || upper > sensorMax) error = `阈值必须位于演示量程 ${sensorMin.toFixed(2)}–${sensorMax.toFixed(2)} mH₂O 内。`;
+        else if (lower >= upper) error = '下限必须小于上限。';
+        else if (upper - lower < minimumGap - Number.EPSILON) error = `上下限间距不能小于 ${minimumGap.toFixed(2)} mH₂O。`;
+        if (error) { $('thresholdError').textContent = error; return; }
+        const previous = `${state.low.toFixed(2)}/${state.high.toFixed(2)}`;
+        state.low = Number(lower.toFixed(2)); state.high = Number(upper.toFixed(2));
+        closeThresholdSettings(); updateThresholdUI();
+        addEvent(`液位阈值由 ${previous} 调整为 ${state.low.toFixed(2)}/${state.high.toFixed(2)} mH₂O`, '配置');
+        updateLevel(); toast(state.mode === 'auto' ? '阈值已保存并立即应用' : '阈值已保存');
+      }
+      function openMapping() { $('mappingBackdrop').classList.add('show'); setTimeout(() => $('mappingClose').focus(), 30); }
+      function closeMapping() { $('mappingBackdrop').classList.remove('show'); }
+
+      function updateUnit() {
+        const map = {
+          payload: ['mH₂O', '单位来自网关数据包', '水柱压力 · payload.unit'],
+          code: ['mH₂O', 'unit code 7 映射', '水柱压力 · unit code 7'],
+          fallback: ['mH₂O', 'Node-RED 默认单位', '水柱压力 · 注册表默认单位'],
+          unknown: ['?', '单位未知 · 自动控制暂停', '水柱压力 · 单位无法解析']
+        };
+        $('levelUnit').textContent = map[state.unitMode][0]; $('unitSource').textContent = map[state.unitMode][1];
+        $('waterUnitCaption').textContent = map[state.unitMode][2];
+        $('unitSource').style.color = state.unitMode === 'unknown' ? 'var(--danger)' : '';
+      }
+      function updateWaterChart() {
+        const endY = 67 - ((state.level - .3) / 1.2) * 43;
+        const points = [58,57,54,52,48,45,43,39,37,34,endY].map((y,i) => `${i*30},${Math.max(18,Math.min(70,y))}`);
+        $('waterLine').setAttribute('d', `M${points.join(' L')}`); $('waterFill').setAttribute('d', `M${points.join(' L')} L300,78 L0,78Z`);
+        $('waterDot').setAttribute('cy', Math.max(18,Math.min(70,endY)));
+      }
+      function scalePercent(value) { return Math.max(0, Math.min(100, ((value - sensorMin) / (sensorMax - sensorMin)) * 100)); }
+      function updateThresholdUI() {
+        const lowPct = scalePercent(state.low), highPct = scalePercent(state.high);
+        $('lowMark').style.left = `${lowPct}%`; $('highMark').style.left = `${highPct}%`;
+        $('lowLabel').textContent = `开 ${state.low.toFixed(2)}`; $('highLabel').textContent = `关 ${state.high.toFixed(2)}`;
+        $('ruleScale').style.background = `linear-gradient(90deg,#dbeeff 0 ${lowPct}%,#e1f4f1 ${lowPct}% ${highPct}%,#fde8d3 ${highPct}%)`;
+        $('thresholdHint').textContent = `拖到 ${state.low.toFixed(2)} 以下，自动模式将打开进水阀；拖到 ${state.high.toFixed(2)} 以上，自动关闭。`;
+        const lowDemo = Math.max(sensorMin, state.low - .15), normalDemo = (state.low + state.high) / 2, highDemo = Math.min(sensorMax, state.high + .10);
+        $('levelLow').textContent = `低液位 ${lowDemo.toFixed(2)}`; $('levelLow').dataset.value = lowDemo.toFixed(2);
+        $('levelNormal').textContent = `保持区间 ${normalDemo.toFixed(2)}`; $('levelNormal').dataset.value = normalDemo.toFixed(2);
+        $('levelHigh').textContent = `高液位 ${highDemo.toFixed(2)}`; $('levelHigh').dataset.value = highDemo.toFixed(2);
+      }
+      function updateLevel() {
+        $('levelValue').textContent = state.level.toFixed(2); $('rangeValue').textContent = state.level.toFixed(2);
+        $('levelRange').value = state.level.toFixed(2);
+        const pct = Math.max(0, Math.min(100, ((state.level - .3) / 1.2) * 100));
+        $('levelBand').textContent = state.level <= state.low ? '低液位' : state.level >= state.high ? '高液位' : '保持区间';
+        $('levelMarker').style.left = `${pct}%`;
+        updateWaterChart(); updateUnit(); evaluateRule();
+      }
+      function updateValve() {
+        $('valveMain').textContent = `最后指令：${state.valve === 'open' ? '打开' : '关闭'}`;
+        $('valveStateCard').classList.toggle('open', state.valve === 'open');
+        $('valveToggle').classList.toggle('on', state.valve === 'open'); $('valveToggle').setAttribute('aria-pressed', state.valve === 'open');
+        $('autoMode').classList.toggle('active', state.mode === 'auto'); $('manualMode').classList.toggle('active', state.mode === 'manual');
+        $('autoMode').setAttribute('aria-pressed', state.mode === 'auto'); $('manualMode').setAttribute('aria-pressed', state.mode === 'manual');
+        $('valveToggle').disabled = state.mode !== 'manual' || !state.gateway || !state.waterOnline || state.pending;
+        $('ruleLive').textContent = state.mode === 'auto' ? '自动模式已启用' : '已由手动接管';
+        $('manualHelp').textContent = state.mode === 'manual' ? '手动模式优先。打开需要确认，关闭立即执行。' : '当前由液位规则控制。需要人工操作时请先切换为手动模式。';
+      }
+      function sendValve(target, source) {
+        if (state.pending || !state.gateway) return;
+        state.pending = true; updateValve(); $('commandProgress').textContent = `${source === 'auto' ? '自动规则' : '手动'}命令发送中…`;
+        addEvent(`${source === 'auto' ? '自动规则' : '手动'}请求${target === 'open' ? '打开' : '关闭'}进水阀`, source === 'auto' ? '自动' : '手动');
+        setTimeout(() => { if (!state.pending) return; $('commandProgress').textContent = '网关已接受，等待节点确认…'; }, 420);
+        setTimeout(() => {
+          if (!state.pending) return; state.valve = target; state.pending = false; updateValve();
+          $('commandProgress').textContent = `节点已确认继电器${target === 'open' ? '吸合' : '断开'}`;
+          addEvent(`进水阀${target === 'open' ? '打开' : '关闭'}命令已确认`, '控制'); toast(`进水阀已${target === 'open' ? '打开' : '关闭'}（命令确认）`);
+          if (state.mode === 'auto') evaluateRule();
+        }, 1050);
+      }
+      function evaluateRule() {
+        clearTimeout(autoTimer);
+        if (state.mode !== 'auto') { $('ruleDecision').textContent = '手动接管'; updateValve(); return; }
+        if (!state.gateway || !state.waterOnline || state.unitMode === 'unknown') {
+          $('ruleDecision').textContent = '自动控制降级'; $('commandProgress').textContent = '水位数据不可用，自动规则请求安全关闭'; updateValve();
+          if (state.valve !== 'closed' && !state.pending && state.gateway) autoTimer = setTimeout(() => sendValve('closed','auto'), 350);
+          return;
+        }
+        let target = null;
+        if (state.level <= state.low) { $('ruleDecision').textContent = '低液位 · 开阀'; target = 'open'; }
+        else if (state.level >= state.high) { $('ruleDecision').textContent = '高液位 · 关阀'; target = 'closed'; }
+        else { $('ruleDecision').textContent = `保持${state.valve === 'open' ? '打开' : '关闭'}`; $('commandProgress').textContent = '自动规则运行中，当前液位处于保持区间'; }
+        updateValve();
+        if (target && target !== state.valve && !state.pending) autoTimer = setTimeout(() => sendValve(target,'auto'), 420);
+      }
+      async function setMode(mode) {
+        if (mode === state.mode) return;
+        const toManual = mode === 'manual';
+        const ok = await confirmAction(toManual ? '切换为手动模式？' : '启用液位自动控制？', toManual ? '手动模式将暂停液位自动控制，并保留当前阀门指令状态。人工操作的优先级高于自动规则。' : '自动模式会立即根据当前液位判断阀门，当前手动状态可能改变。', toManual ? '确认接管' : '启用自动');
+        if (!ok) return;
+        state.mode = mode; addEvent(toManual ? '操作员切换为手动模式' : '操作员启用液位自动控制', '模式'); updateValve(); evaluateRule();
+      }
+
+      $('autoMode').addEventListener('click', () => setMode('auto')); $('manualMode').addEventListener('click', () => setMode('manual'));
+      $('valveToggle').addEventListener('click', async () => {
+        const target = state.valve === 'open' ? 'closed' : 'open';
+        if (target === 'open') { const ok = await confirmAction('确认打开进水阀？','即将打开进水阀，请确认现场管路连接可靠、目标水位安全。','确认打开'); if (!ok) return; }
+        sendValve(target,'manual');
+      });
+      $('modalCancel').addEventListener('click', () => closeModal(false)); $('modalConfirm').addEventListener('click', () => closeModal(true));
+      $('modalBackdrop').addEventListener('click', e => { if (e.target === $('modalBackdrop')) closeModal(false); });
+      $('thresholdSettings').addEventListener('click', openThresholdSettings);
+      $('thresholdCancel').addEventListener('click', closeThresholdSettings); $('thresholdSave').addEventListener('click', saveThresholds);
+      $('thresholdBackdrop').addEventListener('click', e => { if (e.target === $('thresholdBackdrop')) closeThresholdSettings(); });
+      $('lowerInput').addEventListener('input', () => { $('thresholdError').textContent = ''; }); $('upperInput').addEventListener('input', () => { $('thresholdError').textContent = ''; });
+      $('openMapping').addEventListener('click', openMapping); $('mappingClose').addEventListener('click', closeMapping);
+      $('mappingBackdrop').addEventListener('click', e => { if (e.target === $('mappingBackdrop')) closeMapping(); });
+
+      $('levelRange').addEventListener('input', e => { state.level = Number(e.target.value); updateLevel(); });
+      $('levelLow').addEventListener('click', e => { state.level = Number(e.currentTarget.dataset.value); updateLevel(); addEvent(`演示注入 3 个低液位样本：${state.level.toFixed(2)} mH₂O`, '演示'); });
+      $('levelNormal').addEventListener('click', e => { state.level = Number(e.currentTarget.dataset.value); updateLevel(); addEvent(`演示液位进入保持区间：${state.level.toFixed(2)} mH₂O`, '演示'); });
+      $('levelHigh').addEventListener('click', e => { state.level = Number(e.currentTarget.dataset.value); updateLevel(); addEvent(`演示注入 3 个高液位样本：${state.level.toFixed(2)} mH₂O`, '演示'); });
+      $('unitMode').addEventListener('change', e => { state.unitMode = e.target.value; updateLevel(); addEvent(`水位单位场景：${e.target.options[e.target.selectedIndex].text}`, '演示'); });
+      $('openDemo').addEventListener('click', () => { $('drawerBackdrop').classList.add('show'); $('demoDrawer').classList.add('show'); });
+      function closeDrawer() { $('drawerBackdrop').classList.remove('show'); $('demoDrawer').classList.remove('show'); }
+      $('closeDemo').addEventListener('click', closeDrawer); $('drawerBackdrop').addEventListener('click', closeDrawer);
+
+      $('refreshSerial').addEventListener('click', () => {
+        $('gatewayState').textContent = '正在刷新串口…'; $('gatewayDetail').textContent = '异步枚举，不阻塞服务'; $('gatewayDot').className = 'dot warn';
+        setTimeout(() => { $('serialSelect').innerHTML = '<option value="COM24">COM24 · nRF52840 Dongle · Nordic Semiconductor</option><option value="COM7">COM7 · USB Serial Device</option>'; $('gatewayState').textContent = state.gateway ? '网关在线' : '请选择网关'; $('gatewayDetail').textContent = state.gateway ? 'COM24 · 115200 8N1' : '发现 2 个串口'; $('gatewayDot').className = state.gateway ? 'dot live' : 'dot warn'; addEvent('用户刷新串口，发现 2 个候选', '连接'); }, 750);
+      });
+      $('connectSerial').addEventListener('click', () => {
+        const port = $('serialSelect').value; $('gatewayState').textContent = '正在连接…'; $('gatewayDetail').textContent = `${port} · 等待合法网关 JSON`; $('gatewayDot').className = 'dot warn';
+        setTimeout(() => {
+          if (port === 'COM24') { state.gateway = true; $('gatewayState').textContent = '网关在线'; $('gatewayDetail').textContent = 'COM24 · 115200 8N1'; $('gatewayDot').className = 'dot live'; addEvent('已连接并记住网关 COM24', '连接'); toast('网关连接成功'); }
+          else { state.gateway = false; $('gatewayState').textContent = '未识别为网关'; $('gatewayDetail').textContent = 'COM7 未返回合法 BLE Mesh JSON'; $('gatewayDot').className = 'dot error'; addEvent('COM7 未识别为 BLE Mesh 网关', '连接', true); toast('连接失败：未收到合法网关数据'); }
+          updateValve();
+        }, 900);
+      });
+      $('disconnectSerial').addEventListener('click', () => { if (state.pending) return toast('水阀命令等待结果，暂不能断开'); state.gateway = false; $('gatewayState').textContent = '网关未连接'; $('gatewayDetail').textContent = '服务保持运行，可手动重新连接'; $('gatewayDot').className = 'dot'; addEvent('用户断开 USB 网关', '连接', true); updateValve(); });
+
+      $('simulateOffline').addEventListener('click', () => { state.waterOnline = false; $('waterCard').style.borderColor = '#efb7b3'; addEvent('水位传感器离线，自动控制降级', '告警', true); evaluateRule(); toast('已模拟水位传感器离线'); });
+      $('simulateGateway').addEventListener('click', () => { $('disconnectSerial').click(); });
+      $('restoreAll').addEventListener('click', () => { state.gateway = true; state.waterOnline = true; state.unitMode = 'payload'; $('unitMode').value = 'payload'; $('waterCard').style.borderColor = ''; $('gatewayState').textContent = '网关在线'; $('gatewayDetail').textContent = 'COM24 · 115200 8N1'; $('gatewayDot').className = 'dot live'; addEvent('演示环境恢复全部正常', '系统'); updateLevel(); updateValve(); toast('全部设备已恢复'); });
+      $('clearEvents').addEventListener('click', () => { $('eventList').innerHTML = ''; addEvent('演示事件已清空', '系统'); });
+      $('navEvents').addEventListener('click', () => $('eventsPanel').scrollIntoView({behavior:'smooth',block:'center'}));
+      $('navDiagnostics').addEventListener('click', () => $('connectionPanel').scrollIntoView({behavior:'smooth',block:'center'}));
+      document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        if ($('mappingBackdrop').classList.contains('show')) closeMapping();
+        else if ($('thresholdBackdrop').classList.contains('show')) closeThresholdSettings();
+        else if ($('modalBackdrop').classList.contains('show')) closeModal(false);
+        else closeDrawer();
+      });
+
+      setInterval(() => { $('lastUpdated').textContent = '刚刚'; }, 2000);
+      updateThresholdUI(); updateLevel(); updateValve();
+      $('gatewayState').textContent = '正在识别上次网关…'; $('gatewayDetail').textContent = '后台单次尝试，不阻塞 Dashboard'; $('gatewayDot').className = 'dot warn';
+      setTimeout(() => { $('gatewayState').textContent = '网关在线'; $('gatewayDetail').textContent = 'COM24 · 115200 8N1 · 已记住'; $('gatewayDot').className = 'dot live'; addEvent('已识别上次使用的网关 COM24', '连接'); }, 850);
+    })();
+  </script>
+</body>
+</html>
