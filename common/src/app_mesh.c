@@ -11,6 +11,7 @@
 #include "app_mesh.h"
 
 static const struct app_mesh_callbacks *registered_callbacks;
+static uint32_t local_hardware_id;
 
 static uint8_t device_uuid[16] = {
 	0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd, 0xdd,
@@ -63,6 +64,8 @@ APP_MESSAGE_HANDLER(ph_calibrate_received, APP_OPCODE_PH_CALIBRATE)
 APP_MESSAGE_HANDLER(ph_calibration_result_received, APP_OPCODE_PH_CALIBRATION_RESULT)
 APP_MESSAGE_HANDLER(do_report_received, APP_OPCODE_DO_REPORT)
 APP_MESSAGE_HANDLER(orp_report_received, APP_OPCODE_ORP_REPORT)
+APP_MESSAGE_HANDLER(sensor_status_received, APP_OPCODE_SENSOR_STATUS)
+APP_MESSAGE_HANDLER(water_level_report_received, APP_OPCODE_WATER_LEVEL_REPORT)
 
 static const struct bt_mesh_model_op application_model_ops[] = {
 	{ APP_MESH_OP(APP_OPCODE_NODE_HEARTBEAT), BT_MESH_LEN_EXACT(4), node_heartbeat_received },
@@ -73,7 +76,7 @@ static const struct bt_mesh_model_op application_model_ops[] = {
 	{ APP_MESH_OP(APP_OPCODE_SERVO_RESULT), BT_MESH_LEN_EXACT(5), servo_result_received },
 	{ APP_MESH_OP(APP_OPCODE_GATEWAY_HEARTBEAT), BT_MESH_LEN_EXACT(2), gateway_heartbeat_received },
 	{ APP_MESH_OP(APP_OPCODE_SERVO_CALIBRATE_STOP), BT_MESH_LEN_EXACT(4), servo_calibration_received },
-	{ APP_MESH_OP(APP_OPCODE_NODE_ONLINE), BT_MESH_LEN_EXACT(3), node_online_received },
+	{ APP_MESH_OP(APP_OPCODE_NODE_ONLINE), BT_MESH_LEN_MIN(3), node_online_received },
 	{ APP_MESH_OP(APP_OPCODE_NODE_ONLINE_ACK), BT_MESH_LEN_EXACT(3), node_online_ack_received },
 	{ APP_MESH_OP(APP_OPCODE_PH_REPORT), BT_MESH_LEN_EXACT(8), ph_report_received },
 	{ APP_MESH_OP(APP_OPCODE_PH_CALIBRATE), BT_MESH_LEN_EXACT(3), ph_calibrate_received },
@@ -81,6 +84,9 @@ static const struct bt_mesh_model_op application_model_ops[] = {
 	  ph_calibration_result_received },
 	{ APP_MESH_OP(APP_OPCODE_DO_REPORT), BT_MESH_LEN_EXACT(8), do_report_received },
 	{ APP_MESH_OP(APP_OPCODE_ORP_REPORT), BT_MESH_LEN_EXACT(8), orp_report_received },
+	{ APP_MESH_OP(APP_OPCODE_SENSOR_STATUS), BT_MESH_LEN_EXACT(6), sensor_status_received },
+	{ APP_MESH_OP(APP_OPCODE_WATER_LEVEL_REPORT), BT_MESH_LEN_EXACT(6),
+	  water_level_report_received },
 	BT_MESH_MODEL_OP_END,
 };
 
@@ -164,10 +170,14 @@ static int send_message(enum app_opcode opcode, uint16_t destination, const uint
 
 int app_mesh_init(const struct app_mesh_callbacks *callbacks)
 {
+	ssize_t device_id_length;
 	int err;
 
 	registered_callbacks = callbacks;
-	(void)hwinfo_get_device_id(&device_uuid[8], sizeof(device_uuid) - 8U);
+	device_id_length = hwinfo_get_device_id(&device_uuid[8], sizeof(device_uuid) - 8U);
+	if (device_id_length >= sizeof(local_hardware_id)) {
+		local_hardware_id = sys_get_le32(&device_uuid[8]);
+	}
 
 	err = bt_enable(NULL);
 	if (err) {
@@ -203,10 +213,16 @@ bool app_mesh_is_provisioned(void)
 
 int app_mesh_send_node_online(enum app_device_type device_type, uint8_t token)
 {
-	const uint8_t payload[] = { APP_PROTOCOL_VERSION, device_type, token };
+	uint8_t payload[7] = { APP_PROTOCOL_VERSION, device_type, token };
+	size_t payload_len = 3U;
+
+	if (device_type == APP_DEVICE_GENERAL_RS485) {
+		sys_put_le32(local_hardware_id, &payload[3]);
+		payload_len = sizeof(payload);
+	}
 
 	return send_message(APP_OPCODE_NODE_ONLINE, APP_GROUP_NODE_STATUS, payload,
-			    sizeof(payload));
+			    payload_len);
 }
 
 int app_mesh_send_node_online_ack(uint16_t destination, enum app_device_type device_type,
@@ -349,4 +365,34 @@ int app_mesh_send_orp_report(int16_t temperature_x10, int16_t orp_x10,
 	sys_put_le16((uint16_t)drift_x10, &payload[5]);
 	payload[7] = sequence;
 	return send_message(APP_OPCODE_ORP_REPORT, APP_GROUP_NODE_STATUS, payload, sizeof(payload));
+}
+
+int app_mesh_send_sensor_status(enum app_sensor_type sensor_type, uint8_t rs485_address,
+				enum app_sensor_status status,
+				enum app_sensor_error error, uint8_t sequence)
+{
+	const uint8_t payload[] = {
+		APP_PROTOCOL_VERSION,
+		sensor_type,
+		rs485_address,
+		status,
+		error,
+		sequence,
+	};
+
+	return send_message(APP_OPCODE_SENSOR_STATUS, APP_GROUP_NODE_STATUS, payload,
+			    sizeof(payload));
+}
+
+int app_mesh_send_water_level_report(int16_t raw_value, uint8_t decimal_places,
+				     uint8_t unit_code, uint8_t sequence)
+{
+	uint8_t payload[6] = { APP_PROTOCOL_VERSION };
+
+	sys_put_le16((uint16_t)raw_value, &payload[1]);
+	payload[3] = decimal_places;
+	payload[4] = unit_code;
+	payload[5] = sequence;
+	return send_message(APP_OPCODE_WATER_LEVEL_REPORT, APP_GROUP_NODE_STATUS, payload,
+			    sizeof(payload));
 }

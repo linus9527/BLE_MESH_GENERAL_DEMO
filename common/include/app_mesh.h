@@ -52,5 +52,10 @@ int app_mesh_send_do_report(uint16_t dissolved_oxygen_x100, int16_t temperature_
 			    uint8_t sequence);
 int app_mesh_send_orp_report(int16_t temperature_x10, int16_t orp_x10,
 			     int16_t drift_x10, uint8_t sequence);
+int app_mesh_send_sensor_status(enum app_sensor_type sensor_type, uint8_t rs485_address,
+				enum app_sensor_status status,
+				enum app_sensor_error error, uint8_t sequence);
+int app_mesh_send_water_level_report(int16_t raw_value, uint8_t decimal_places,
+				     uint8_t unit_code, uint8_t sequence);
 
 #endif
